@@ -1,120 +1,127 @@
-import { UploadCloud, FileAudio, X } from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { useTasks } from "@/context/TaskContext";
 
 export function UploadMeetingAudio() {
-    const [dragActive, setDragActive] = useState(false);
-    const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [extractedTasks, setExtractedTasks] = useState<any[]>([]);
+  const { addTask } = useTasks();
 
-    const handleDrag = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
-        }
-    };
+  const handleProcess = async () => {
+    if (!file) return alert("Please select a file.");
 
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            setFile(e.dataTransfer.files[0]);
-        }
-    };
+    setLoading(true);
+    const formData = new FormData();
+    formData.append("audio", file);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
+    try {
+      console.log("📤 Sending audio to backend...");
+      const res = await fetch("http://localhost:3000/api/ai/analyze-voice", {
+        method: "POST",
+        body: formData,
+      });
 
-    return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold tracking-tight">Upload Meeting Audio</h1>
-                <p className="text-muted-foreground mt-2">
-                    Upload audio files from meetings to generate minutes and tasks automatically.
-                </p>
-            </div>
+      console.log("📥 Response status:", res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ HTTP Error Response:", errorText);
+        throw new Error(`Processing failed with status ${res.status}: ${errorText}`);
+      }
 
-            <div className="bg-card border border-border rounded-xl p-8">
-                <div
-                    className={cn(
-                        "relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg transition-colors",
-                        dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25",
-                        "hover:border-primary/50 hover:bg-muted/50"
-                    )}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                >
-                    {!file ? (
-                        <>
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <div className="rounded-full bg-primary/10 p-4 mb-4">
-                                    <UploadCloud className="w-8 h-8 text-primary" />
-                                </div>
-                                <p className="mb-2 text-sm font-medium text-foreground">
-                                    <span className="font-semibold text-primary">Click to upload</span> or drag and drop
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    MP3, WAV, or M4A (MAX. 50MB)
-                                </p>
-                            </div>
-                            <input
-                                id="dropzone-file"
-                                type="file"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                onChange={handleFileChange}
-                                accept="audio/*"
-                            />
-                        </>
-                    ) : (
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="relative">
-                                <div className="rounded-full bg-blue-100 p-4">
-                                    <FileAudio className="w-8 h-8 text-blue-600" />
-                                </div>
-                                <button
-                                    onClick={() => setFile(null)}
-                                    className="absolute -top-1 -right-1 rounded-full bg-destructive text-destructive-foreground p-1 hover:bg-destructive/90"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-sm font-medium">{file.name}</p>
-                                <p className="text-xs text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
+      const data = await res.json();
+      console.log("✅ Response data:", data);
 
-                {file && (
-                    <div className="mt-6 flex justify-end gap-3">
-                        <button
-                            onClick={() => setFile(null)}
-                            className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted rounded-md transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors shadow-sm">
-                            Process Audio
-                        </button>
-                    </div>
-                )}
-            </div>
+      // ✅ Loop through the extracted tasks (handles multiple people/tasks)
+      if (!data.extracted || !Array.isArray(data.extracted)) {
+        console.error("❌ Invalid response format:", data);
+        throw new Error("Invalid response format from backend");
+      }
 
-            <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-blue-800">Note on Privacy</h3>
-                <p className="text-sm text-blue-600 mt-1">
-                    All uploaded audio files are processed securely and automatically deleted after 30 days. ensuring compliance with university data protection policies.
-                </p>
-            </div>
+      // Store transcript and tasks for display
+      setTranscript(data.transcript);
+      setExtractedTasks(data.extracted);
+
+      data.extracted.forEach((task: any) => {
+        addTask({
+          title: task.title || "Untitled Task",
+          assignee: task.assignee || "Unknown",
+          dueDate: task.dueDate || "",
+          priority: task.priority || "Medium",
+          status: "Pending",
+          category: "Approval",
+          description: `Extracted from: "${data.transcript}"`,
+        });
+      });
+
+      alert(`Success! Extracted ${data.extracted.length} tasks.`);
+      setFile(null);
+    } catch (err: any) {
+      console.error("❌ Frontend Error:", err);
+      alert(`Error: ${err.message || "Error processing audio. Check browser console."}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="p-6 bg-white rounded-lg shadow-md space-y-4">
+        <h2 className="text-xl font-bold">AI Meeting Transcriber</h2>
+        <input
+          type="file"
+          accept="audio/*,video/mp4"
+          onChange={(e) => e.target.files && setFile(e.target.files[0])}
+          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        />
+        {file && (
+          <button
+            onClick={handleProcess}
+            disabled={loading}
+            className="w-full py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-400"
+          >
+            {loading ? "🤖 AI is thinking..." : "Extract Tasks"}
+          </button>
+        )}
+      </div>
+
+      {/* Display Transcript */}
+      {transcript && (
+        <div className="p-6 bg-blue-50 rounded-lg shadow-md border-l-4 border-blue-500">
+          <h3 className="text-lg font-bold mb-3 text-blue-900">📝 Transcript</h3>
+          <p className="text-gray-700 bg-white p-4 rounded-md">{transcript}</p>
         </div>
-    );
+      )}
+
+      {/* Display Extracted Tasks */}
+      {extractedTasks.length > 0 && (
+        <div className="p-6 bg-green-50 rounded-lg shadow-md border-l-4 border-green-500">
+          <h3 className="text-lg font-bold mb-4 text-green-900">✅ Extracted Tasks ({extractedTasks.length})</h3>
+          <div className="space-y-3">
+            {extractedTasks.map((task, index) => (
+              <div key={index} className="bg-white p-4 rounded-md shadow-sm border border-green-200">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h4 className="font-semibold text-gray-800">{task.title || "Untitled Task"}</h4>
+                    <p className="text-sm text-gray-600">👤 Assignee: {task.assignee || "Unknown"}</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    task.priority === "High" ? "bg-red-100 text-red-800" :
+                    task.priority === "Medium" ? "bg-yellow-100 text-yellow-800" :
+                    "bg-green-100 text-green-800"
+                  }`}>
+                    {task.priority || "Medium"}
+                  </span>
+                </div>
+                {task.dueDate && (
+                  <p className="text-sm text-gray-600">📅 Due: {task.dueDate}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

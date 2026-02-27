@@ -1,32 +1,59 @@
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Filter } from "lucide-react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { v4 as uuidv4 } from "uuid";
 
-export default function Tasks() {
+export type TaskStatus = "Pending" | "In Progress" | "Completed" | "Approved" | "Rejected";
+export type TaskPriority = "Low" | "Medium" | "High";
+
+export interface Task {
+    id: string;
+    title: string;
+    assignee: string;
+    dueDate: string;
+    priority: TaskPriority;
+    status: TaskStatus;
+    category: "Approval" | "Faculty";
+    description?: string;
+}
+
+interface TaskContextType {
+    tasks: Task[];
+    updateTaskStatus: (id: string, newStatus: TaskStatus) => void;
+    addTask: (task: Omit<Task, "id">) => void;
+    getTask: (id: string) => Task | undefined;
+}
+
+const TaskContext = createContext<TaskContextType | undefined>(undefined);
+
+export function TaskProvider({ children }: { children: ReactNode }) {
+    const [tasks, setTasks] = useState<Task[]>([]);
+
+    const addTask = (task: Omit<Task, "id">) => {
+        const newTask: Task = {
+            ...task,
+            id: uuidv4(),
+        };
+        setTasks(prev => [...prev, newTask]);
+    };
+
+    const updateTaskStatus = (id: string, newStatus: TaskStatus) => {
+        setTasks(prev =>
+            prev.map(task =>
+                task.id === id ? { ...task, status: newStatus } : task
+            )
+        );
+    };
+
+    const getTask = (id: string) => tasks.find(t => t.id === id);
+
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Manage your tasks and projects.
-                    </p>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input className="pl-9" placeholder="Search tasks..." />
-                </div>
-                <Button variant="outline" size="icon">
-                    <Filter className="h-4 w-4" />
-                </Button>
-            </div>
-
-            <div className="rounded-md border text-center p-12 text-muted-foreground">
-                List of tasks will appear here.
-            </div>
-        </div>
+        <TaskContext.Provider value={{ tasks, updateTaskStatus, addTask, getTask }}>
+            {children}
+        </TaskContext.Provider>
     );
+}
+
+export function useTasks() {
+    const context = useContext(TaskContext);
+    if (!context) throw new Error("useTasks must be used within TaskProvider");
+    return context;
 }
