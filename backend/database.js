@@ -1,38 +1,16 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+import pkg from "pg";
+import dotenv from "dotenv";
 
-// Create connection to SQLite database
-const dbPath = path.resolve(__dirname, 'user_data.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error connecting to database:', err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-    }
+dotenv.config();
+
+const { Pool } = pkg;
+
+const pool = new Pool({
+  user: process.env.DB_USER,
+  host: "localhost",
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: 5432,
 });
 
-// Initialize database
-db.serialize(() => {
-    // Create profile table if it doesn't exist
-    db.run(`CREATE TABLE IF NOT EXISTS profile (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fullName TEXT,
-        email TEXT,
-        role TEXT,
-        phone TEXT,
-        location TEXT,
-        avatarUrl TEXT
-    )`);
-
-    // Check if profile exists, if not create default
-    db.get("SELECT * FROM profile WHERE id = 1", (err, row) => {
-        if (!row) {
-            console.log('Seeding initial profile data...');
-            const insert = db.prepare(`INSERT INTO profile (fullName, email, role, phone, location) VALUES (?, ?, ?, ?, ?)`);
-            insert.run('Admin User', 'admin@university.edu', 'Department Administrator', '+1 (555) 123-4567', 'Building A, Room 302');
-            insert.finalize();
-        }
-    });
-});
-
-module.exports = db;
+export default pool;
