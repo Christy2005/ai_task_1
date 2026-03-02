@@ -1,11 +1,12 @@
+// ⚠️ env.js MUST be the FIRST import — it bootstraps process.env
+// before any other module (especially database.js) runs.
+import "./env.js";
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 
 import authRoutes from "./routes/authRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
-
-dotenv.config();
 
 const app = express();
 
@@ -15,7 +16,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173", // frontend URL
+    origin: process.env.ALLOWED_ORIGIN || "http://localhost:5173",
     credentials: true,
   })
 );
@@ -27,15 +28,11 @@ app.use(express.urlencoded({ extended: true }));
    Routes
 ============================= */
 
-// Health check
 app.get("/", (req, res) => {
   res.json({ message: "Backend running 🚀" });
 });
 
-// Auth routes
 app.use("/api/auth", authRoutes);
-
-// AI routes
 app.use("/api/ai", aiRoutes);
 
 /* =============================
@@ -45,7 +42,10 @@ app.use("/api/ai", aiRoutes);
 app.use((err, req, res, next) => {
   console.error("GLOBAL ERROR:", err.message);
   res.status(500).json({
-    error: err.message || "Internal Server Error",
+    error:
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : err.message,
   });
 });
 
@@ -56,5 +56,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

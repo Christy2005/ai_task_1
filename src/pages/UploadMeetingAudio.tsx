@@ -23,43 +23,68 @@ export function UploadMeetingAudio() {
       });
 
       console.log("📥 Response status:", res.status);
-      
+
       if (!res.ok) {
         const errorText = await res.text();
         console.error("❌ HTTP Error Response:", errorText);
-        throw new Error(`Processing failed with status ${res.status}: ${errorText}`);
+        alert(`Backend error (${res.status}). Check console for details.`);
+        return;
       }
 
-      const data = await res.json();
-      console.log("✅ Response data:", data);
-
-      // ✅ Loop through the extracted tasks (handles multiple people/tasks)
-      if (!data.extracted || !Array.isArray(data.extracted)) {
-        console.error("❌ Invalid response format:", data);
-        throw new Error("Invalid response format from backend");
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        console.error("❌ Failed to parse JSON response:", parseErr);
+        alert("Backend returned an unreadable response.");
+        return;
       }
 
-      // Store transcript and tasks for display
-      setTranscript(data.transcript);
-      setExtractedTasks(data.extracted);
+      console.log("✅ Raw response data:", data);
 
-      data.extracted.forEach((task: any) => {
+      const rawTranscript: string = typeof data.transcript === "string" ? data.transcript : "";
+      const rawTasks: any[] = Array.isArray(data.tasks) ? data.tasks : [];
+
+      console.log(`📋 Transcript length: ${rawTranscript.length} chars`);
+      console.log(`🗂️ Tasks received: ${rawTasks.length}`);
+
+      setTranscript(rawTranscript || null);
+
+      const normalizedTasks = rawTasks.map((task: any, idx: number) => {
+        const title: string = task?.title || "Untitled Task";
+        const assignee: string = task?.assignee || task?.assigned_to || "Unknown";
+        const dueDate: string = task?.dueDate || task?.due_date || "";
+        const priority: string = task?.priority || "Medium";
+
+        console.log(`  Task[${idx}]:`, { title, assignee, dueDate, priority });
+
+        return { title, assignee, dueDate, priority };
+      });
+
+      setExtractedTasks(normalizedTasks);
+
+      normalizedTasks.forEach((task) => {
         addTask({
-          title: task.title || "Untitled Task",
-          assignee: task.assignee || "Unknown",
-          dueDate: task.dueDate || "",
-          priority: task.priority || "Medium",
+          title: task.title,
+          assignee: task.assignee,
+          dueDate: task.dueDate,
+          priority: task.priority,
           status: "Pending",
           category: "Approval",
-          description: `Extracted from: "${data.transcript}"`,
+          description: rawTranscript ? `Extracted from: "${rawTranscript}"` : "Extracted from audio",
         });
       });
 
-      alert(`Success! Extracted ${data.extracted.length} tasks.`);
+      if (normalizedTasks.length === 0) {
+        alert("Processing complete. No tasks were extracted from this audio.");
+      } else {
+        alert(`Success! Extracted ${normalizedTasks.length} task${normalizedTasks.length === 1 ? "" : "s"}.`);
+      }
+
       setFile(null);
     } catch (err: any) {
       console.error("❌ Frontend Error:", err);
-      alert(`Error: ${err.message || "Error processing audio. Check browser console."}`);
+      alert(`Unexpected error: ${err?.message || "Check the browser console for details."}`);
     } finally {
       setLoading(false);
     }
@@ -86,7 +111,6 @@ export function UploadMeetingAudio() {
         )}
       </div>
 
-      {/* Display Transcript */}
       {transcript && (
         <div className="p-6 bg-blue-50 rounded-lg shadow-md border-l-4 border-blue-500">
           <h3 className="text-lg font-bold mb-3 text-blue-900">📝 Transcript</h3>
@@ -94,7 +118,6 @@ export function UploadMeetingAudio() {
         </div>
       )}
 
-      {/* Display Extracted Tasks */}
       {extractedTasks.length > 0 && (
         <div className="p-6 bg-green-50 rounded-lg shadow-md border-l-4 border-green-500">
           <h3 className="text-lg font-bold mb-4 text-green-900">✅ Extracted Tasks ({extractedTasks.length})</h3>
@@ -103,15 +126,18 @@ export function UploadMeetingAudio() {
               <div key={index} className="bg-white p-4 rounded-md shadow-sm border border-green-200">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <h4 className="font-semibold text-gray-800">{task.title || "Untitled Task"}</h4>
-                    <p className="text-sm text-gray-600">👤 Assignee: {task.assignee || "Unknown"}</p>
+                    <h4 className="font-semibold text-gray-800">{task.title}</h4>
+                    <p className="text-sm text-gray-600">👤 Assignee: {task.assignee}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    task.priority === "High" ? "bg-red-100 text-red-800" :
-                    task.priority === "Medium" ? "bg-yellow-100 text-yellow-800" :
-                    "bg-green-100 text-green-800"
-                  }`}>
-                    {task.priority || "Medium"}
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${task.priority === "High"
+                        ? "bg-red-100 text-red-800"
+                        : task.priority === "Medium"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-green-100 text-green-800"
+                      }`}
+                  >
+                    {task.priority}
                   </span>
                 </div>
                 {task.dueDate && (
