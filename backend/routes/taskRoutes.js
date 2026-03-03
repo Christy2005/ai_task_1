@@ -1,67 +1,198 @@
-const express = require("express");
+import express from "express";
+import pool from "../database.js";
+import { verifyToken, requireRole } from "../middleware/authMiddleware.js";
+import { createLogger } from "../utils/logger.js";
+
 const router = express.Router();
-const db = require("../database");
-const { v4: uuidv4 } = require("uuid");
+const logger = createLogger("taskRoutes");
 
-// GET ALL TASKS
-router.get("/", (req, res) => {
-    const sql = "SELECT * FROM tasks";
-    db.all(sql, [], (err, rows) => {
-        if (err) {
-            res.status(400).json({ error: err.message });
-            return;
-        }
-        res.json(rows);
-    });
+// All task routes require authentication
+router.use(verifyToken);
+
+// ─── GET /api/tasks ────────────────────────────────────────────────────────────
+// Admin → all tasks (with creator + assignee info)
+// Faculty → only tasks assigned to them
+router.get("/", async (req, res, next) => {
+  try {
+    const { id: userId, role } = req.user;
+
+    let query, params;
+
+    if (role === "admin") {
+      query = `
+        SELECT
+          t.*,
+          u_assigned.name  AS assigned_to_name,
+          u_assigned.email AS assigned_to_email,
+          u_creator.name   AS created_by_name,
+          u_creator.email  AS created_by_email
+        FROM tasks t
+        LEFT JOIN users u_assigned ON t.user_id   = u_assigned.id
+        LEFT JOIN users u_creator  ON t.created_by = u_creator.id
+        ORDER BY t.created_at DESC
+      `;
+      params = [];
+    } else {
+      query = `
+        SELECT
+          t.*,
+          u_creator.name  AS created_by_name,
+          u_creator.email AS created_by_email
+        FROM tasks t
+        LEFT JOIN users u_creator ON t.created_by = u_creator.id
+        WHERE t.user_id = $1
+        ORDER BY t.created_at DESC
+      `;
+      params = [userId];
+    }
+
+    const { rows } = await pool.query(query, params);
+    return res.json({ tasks: rows });
+
+  } catch (error) {
+    logger.error("GET /tasks error:", error.message);
+    next(error);
+  }
 });
 
-// CREATE TASK
-router.post("/", (req, res) => {
-    const {
-        title,
-        assignee,
-        dueDate,
-        priority,
-        status,
-        category,
-        description,
-    } = req.body;
 
-    const id = uuidv4();
+// ─── POST /api/tasks ───────────────────────────────────────────────────────────
+// Admin only — create and assign a task to a faculty member
+router.post("/", requireRole("admin"), async (req, res, next) => {
+  try {
+    const { title, description, user_id, due_date, priority = "Medium", status = "pending" } = req.body;
 
-    const sql = `
-        INSERT INTO tasks 
-        (id, title, assignee, dueDate, priority, status, category, description)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
 
-    db.run(
-        sql,
-        [id, title, assignee, dueDate, priority, status, category, description],
-        function (err) {
-            if (err) {
-                res.status(400).json({ error: err.message });
-                return;
-            }
-            res.json({ id, ...req.body });
-        }
+    if (!user_id) {
+      return res.status(400).json({ error: "user_id (assigned faculty) is required" });
+    }
+
+    // Verify assignee exists and is a faculty member
+    const assigneeCheck = await pool.query(
+      "SELECT id, name, email FROM users WHERE id = $1 AND role = 'faculty'",
+      [user_id]
     );
+
+    if (assigneeCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Faculty user not found" });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO tasks (title, description, status, priority, due_date, user_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [title, description || null, status, priority, due_date || null, user_id, req.user.id]
+    );
+
+    logger.info(`Task created: "${title}" assigned to ${user_id} by admin ${req.user.id}`);
+    return res.status(201).json({ task: rows[0] });
+
+  } catch (error) {
+    logger.error("POST /tasks error:", error.message);
+    next(error);
+  }
 });
 
-// UPDATE STATUS
-router.put("/:id", (req, res) => {
-    const { status } = req.body;
 
-    const sql = "UPDATE tasks SET status = ? WHERE id = ?";
+// ─── PATCH /api/tasks/:id ─────────────────────────────────────────────────────
+// Admin: can update any field on any task
+// Faculty: can only update status of tasks assigned to them
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+    const { id: userId, role } = req.user;
 
-    db.run(sql, [status, req.params.id], function (err) {
-        if (err) {
-            res.status(400).json({ error: err.message });
-            return;
-        }
+    // Fetch task first to verify ownership
+    const taskResult = await pool.query(
+      "SELECT * FROM tasks WHERE id = $1",
+      [taskId]
+    );
 
-        res.json({ updated: this.changes });
-    });
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    const task = taskResult.rows[0];
+
+    // Faculty can only update their own assigned tasks
+    if (role === "faculty") {
+      if (task.user_id !== userId) {
+        return res.status(403).json({ error: "You can only update tasks assigned to you" });
+      }
+
+      // Faculty can only change status
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ error: "Faculty can only update task status" });
+      }
+
+      const { rows } = await pool.query(
+        "UPDATE tasks SET status = $1 WHERE id = $2 RETURNING *",
+        [status, taskId]
+      );
+      logger.info(`Task ${taskId} status updated to "${status}" by faculty ${userId}`);
+      return res.json({ task: rows[0] });
+    }
+
+    // Admin: allow updating any field
+    const { title, description, status, priority, due_date, user_id } = req.body;
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (title !== undefined) { updates.push(`title = $${idx++}`); values.push(title); }
+    if (description !== undefined) { updates.push(`description = $${idx++}`); values.push(description); }
+    if (status !== undefined) { updates.push(`status = $${idx++}`); values.push(status); }
+    if (priority !== undefined) { updates.push(`priority = $${idx++}`); values.push(priority); }
+    if (due_date !== undefined) { updates.push(`due_date = $${idx++}`); values.push(due_date); }
+    if (user_id !== undefined) { updates.push(`user_id = $${idx++}`); values.push(user_id); }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    values.push(taskId);
+    const { rows } = await pool.query(
+      `UPDATE tasks SET ${updates.join(", ")} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+
+    logger.info(`Task ${taskId} updated by admin ${userId}`);
+    return res.json({ task: rows[0] });
+
+  } catch (error) {
+    logger.error("PATCH /tasks/:id error:", error.message);
+    next(error);
+  }
 });
 
-module.exports = router;
+
+// ─── DELETE /api/tasks/:id ────────────────────────────────────────────────────
+// Admin only
+router.delete("/:id", requireRole("admin"), async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+
+    const { rows } = await pool.query(
+      "DELETE FROM tasks WHERE id = $1 RETURNING id, title",
+      [taskId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    logger.info(`Task ${taskId} deleted by admin ${req.user.id}`);
+    return res.json({ message: "Task deleted", task: rows[0] });
+
+  } catch (error) {
+    logger.error("DELETE /tasks/:id error:", error.message);
+    next(error);
+  }
+});
+
+export default router;

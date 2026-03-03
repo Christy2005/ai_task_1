@@ -1,51 +1,85 @@
-// ⚠️ env.js MUST be the FIRST import — it bootstraps process.env
-// before any other module (especially database.js) runs.
+// ⚠️ env.js MUST be the FIRST import — bootstraps process.env
 import "./env.js";
 
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
 
 import authRoutes from "./routes/authRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
+import logger from "./utils/logger.js";
 
 const app = express();
 
 /* =============================
-   Middleware
+   Security & Perf Middleware
 ============================= */
 
+// Set secure HTTP headers
+app.use(helmet());
+
+// Compress response bodies
+app.use(compression());
+
+// CORS
 app.use(
   cors({
     origin: process.env.ALLOWED_ORIGIN || "http://localhost:5173",
     credentials: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 /* =============================
-   Routes
+   Health Check
 ============================= */
 
 app.get("/", (req, res) => {
-  res.json({ message: "Backend running 🚀" });
+  res.json({ status: "ok", message: "AI Task API 🚀", env: process.env.NODE_ENV || "development" });
 });
+
+/* =============================
+   API Routes
+============================= */
 
 app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/tasks", taskRoutes);
+
+/* =============================
+   404 Handler
+============================= */
+
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
+});
 
 /* =============================
    Global Error Handler
 ============================= */
 
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error("GLOBAL ERROR:", err.message);
-  res.status(500).json({
-    error:
-      process.env.NODE_ENV === "production"
-        ? "Internal Server Error"
-        : err.message,
+  const status = err.status || err.statusCode || 500;
+
+  logger.error(
+    `[${req.method}] ${req.originalUrl} → ${status}: ${err.message}`
+  );
+
+  if (process.env.NODE_ENV === "production") {
+    return res.status(status).json({ error: "Internal Server Error" });
+  }
+
+  return res.status(status).json({
+    error: err.message,
+    ...(err.stack ? { stack: err.stack } : {}),
   });
 });
 
@@ -56,5 +90,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  logger.info(`Server running on http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
 });
