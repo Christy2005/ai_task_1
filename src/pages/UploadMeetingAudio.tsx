@@ -11,6 +11,10 @@ export function UploadMeetingAudio() {
   const handleProcess = async () => {
     if (!file) return alert("Please select a file.");
 
+    // ✅ Fix: send the JWT so the backend verifyToken middleware lets us through
+    const token = localStorage.getItem("token");
+    if (!token) return alert("You are not logged in.");
+
     setLoading(true);
     const formData = new FormData();
     formData.append("audio", file);
@@ -19,6 +23,9 @@ export function UploadMeetingAudio() {
       console.log("📤 Sending audio to backend...");
       const res = await fetch("http://localhost:3000/api/ai/analyze-voice", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,  // ✅ Required — backend now enforces verifyToken
+        },
         body: formData,
       });
 
@@ -52,12 +59,11 @@ export function UploadMeetingAudio() {
 
       const normalizedTasks = rawTasks.map((task: any, idx: number) => {
         const title: string = task?.title || "Untitled Task";
-        const assignee: string = task?.assignee || task?.assigned_to || "Unknown";
-        const dueDate: string = task?.dueDate || task?.due_date || "";
+        const assignee: string = task?.assigned_to || task?.assignee || "Unknown";
+        const dueDate: string = task?.due_date || task?.dueDate || "";
         const priority: string = task?.priority || "Medium";
 
         console.log(`  Task[${idx}]:`, { title, assignee, dueDate, priority });
-
         return { title, assignee, dueDate, priority };
       });
 
@@ -68,7 +74,7 @@ export function UploadMeetingAudio() {
           title: task.title,
           assignee: task.assignee,
           dueDate: task.dueDate,
-          priority: task.priority,
+          priority: (task.priority as import("@/context/TaskContext").TaskPriority) ?? "Medium",
           status: "Pending",
           category: "Approval",
           description: rawTranscript ? `Extracted from: "${rawTranscript}"` : "Extracted from audio",
@@ -131,10 +137,10 @@ export function UploadMeetingAudio() {
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-semibold ${task.priority === "High"
-                        ? "bg-red-100 text-red-800"
-                        : task.priority === "Medium"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
+                      ? "bg-red-100 text-red-800"
+                      : task.priority === "Medium"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-green-100 text-green-800"
                       }`}
                   >
                     {task.priority}

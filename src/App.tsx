@@ -10,6 +10,7 @@ import { CalendarPage } from "./pages/CalendarPage";
 import { Profile } from "./pages/Profile";
 import { TaskDetails } from "./pages/TaskDetails";
 import { LoginPage } from "./pages/LoginPage";
+import { FacultyManagement } from "./pages/FacultyManagement";
 import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -48,6 +49,10 @@ const router = createBrowserRouter([
       {
         path: "faculty-tasks",
         element: <FacultyTasks />,
+      },
+      {
+        path: "faculty-management",
+        element: <FacultyManagement />,
       },
       {
         path: "tasks/:taskId",

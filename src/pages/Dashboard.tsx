@@ -1,10 +1,13 @@
-import { Users, FileAudio, CheckCircle, Clock, TrendingUp, ArrowRight, Calendar } from "lucide-react";
+import { Users, FileAudio, CheckCircle, Clock, TrendingUp, ArrowRight, Calendar, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/context/TaskContext";
+import { useAuth } from "@/context/AuthContext";
+import { RoleGate } from "@/components/RoleGate";
 import { useNavigate } from "react-router-dom";
 
 export function Dashboard() {
     const { tasks } = useTasks();
+    const { user } = useAuth();
     const navigate = useNavigate();
 
     const totalTasks = tasks.length;
@@ -56,7 +59,23 @@ export function Dashboard() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold tracking-tight">Dashboard Overview</h1>
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">Dashboard Overview</h1>
+                    {user && (
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-muted-foreground">Welcome, {user.email}</span>
+                            <span className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
+                                user.role === "admin"
+                                    ? "bg-purple-100 text-purple-700"
+                                    : "bg-emerald-100 text-emerald-700"
+                            )}>
+                                <Shield className="h-3 w-3" />
+                                {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                            </span>
+                        </div>
+                    )}
+                </div>
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">Last updated: Just now</span>
                 </div>
@@ -149,24 +168,45 @@ export function Dashboard() {
                         <h3 className="font-semibold">Quick Actions</h3>
                     </div>
                     <div className="p-6 grid grid-cols-2 gap-4">
-                        <button
-                            onClick={() => navigate('/upload-audio')}
-                            className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors hover:border-primary/50"
-                        >
-                            <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                                <FileAudio className="h-5 w-5" />
-                            </div>
-                            <span className="text-sm font-medium">Upload Audio</span>
-                        </button>
-                        <button
-                            onClick={() => navigate('/task-approval')}
-                            className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors hover:border-primary/50"
-                        >
-                            <div className="rounded-full bg-emerald-100 p-2 text-emerald-600">
-                                <CheckCircle className="h-5 w-5" />
-                            </div>
-                            <span className="text-sm font-medium">Approve Tasks</span>
-                        </button>
+                        {/* Admin-only actions */}
+                        <RoleGate allowedRoles={['admin']}>
+                            <button
+                                onClick={() => navigate('/upload-audio')}
+                                className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors hover:border-primary/50"
+                            >
+                                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                                    <FileAudio className="h-5 w-5" />
+                                </div>
+                                <span className="text-sm font-medium">Upload Audio</span>
+                            </button>
+                        </RoleGate>
+
+                        <RoleGate allowedRoles={['admin']}>
+                            <button
+                                onClick={() => navigate('/task-approval')}
+                                className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors hover:border-primary/50"
+                            >
+                                <div className="rounded-full bg-emerald-100 p-2 text-emerald-600">
+                                    <CheckCircle className="h-5 w-5" />
+                                </div>
+                                <span className="text-sm font-medium">Approve Tasks</span>
+                            </button>
+                        </RoleGate>
+
+                        {/* Faculty-only action */}
+                        <RoleGate allowedRoles={['faculty']}>
+                            <button
+                                onClick={() => navigate('/faculty-tasks')}
+                                className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors hover:border-primary/50"
+                            >
+                                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                                    <CheckCircle className="h-5 w-5" />
+                                </div>
+                                <span className="text-sm font-medium">My Tasks</span>
+                            </button>
+                        </RoleGate>
+
+                        {/* Shared actions */}
                         <button
                             onClick={() => navigate('/calendar')}
                             className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors hover:border-primary/50"
@@ -176,6 +216,7 @@ export function Dashboard() {
                             </div>
                             <span className="text-sm font-medium">Schedule Meeting</span>
                         </button>
+
                         <button
                             onClick={() => navigate('/profile')}
                             className="flex flex-col items-center justify-center gap-2 rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors hover:border-primary/50"
@@ -183,7 +224,7 @@ export function Dashboard() {
                             <div className="rounded-full bg-amber-100 p-2 text-amber-600">
                                 <Users className="h-5 w-5" />
                             </div>
-                            <span className="text-sm font-medium">Add Faculty</span>
+                            <span className="text-sm font-medium">Profile</span>
                         </button>
                     </div>
                 </div>

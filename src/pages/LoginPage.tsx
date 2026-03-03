@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Lock, Mail, ArrowRight, BookOpen, User } from "lucide-react";
+import { Lock, Mail, ArrowRight, BookOpen, User, Shield } from "lucide-react";
 
 export function LoginPage() {
     const [isRegister, setIsRegister] = useState(false);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [role, setRole] = useState<"faculty" | "admin">("faculty");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [retrying, setRetrying] = useState(false);
 
     const { login } = useAuth();
     const navigate = useNavigate();
@@ -17,6 +19,7 @@ export function LoginPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+        setRetrying(false);
 
         if (!email || !password || (isRegister && !name)) {
             setError("Please fill in all fields");
@@ -31,16 +34,22 @@ export function LoginPage() {
                 : "http://localhost:3000/api/auth/login";
 
             const bodyData = isRegister
-                ? { name, email, password }
+                ? { name, email, password, role }
                 : { email, password };
 
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(bodyData),
-            });
+            let response: Response;
+            try {
+                response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(bodyData),
+                });
+            } catch {
+                // Network error — likely Neon cold-start
+                setRetrying(true);
+                setError("Database is waking up — please try again in 5 seconds.");
+                return;
+            }
 
             const data = await response.json();
 
@@ -52,14 +61,8 @@ export function LoginPage() {
                 throw new Error("No token received from server");
             }
 
-            // Clear old auth
-            localStorage.clear();
-
-            // Store JWT
-            localStorage.setItem("token", data.token);
-
-            // Update context
-            login(email);
+            // ⚡ Pass the JWT — AuthContext decodes role/id/email automatically
+            login(data.token);
 
             navigate("/", { replace: true });
 
@@ -91,12 +94,10 @@ export function LoginPage() {
                 <form className="space-y-6" onSubmit={handleSubmit}>
                     <div className="space-y-4">
 
-                        {/* Name field (only for register) */}
+                        {/* Name field (register only) */}
                         {isRegister && (
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">
-                                    Full Name
-                                </label>
+                                <label className="text-sm font-medium text-gray-700">Full Name</label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <User className="h-5 w-5 text-gray-400" />
@@ -114,9 +115,7 @@ export function LoginPage() {
 
                         {/* Email */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">
-                                Email address
-                            </label>
+                            <label className="text-sm font-medium text-gray-700">Email address</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <Mail className="h-5 w-5 text-gray-400" />
@@ -134,9 +133,7 @@ export function LoginPage() {
 
                         {/* Password */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">
-                                Password
-                            </label>
+                            <label className="text-sm font-medium text-gray-700">Password</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <Lock className="h-5 w-5 text-gray-400" />
@@ -151,11 +148,43 @@ export function LoginPage() {
                                 />
                             </div>
                         </div>
+
+                        {/* Role selector (register only) */}
+                        {isRegister && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">Role</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {(["faculty", "admin"] as const).map((r) => (
+                                        <button
+                                            key={r}
+                                            type="button"
+                                            onClick={() => setRole(r)}
+                                            className={`flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium transition-colors ${role === r
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            <Shield className="h-4 w-4" />
+                                            {r.charAt(0).toUpperCase() + r.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {error && (
-                        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                        <div className={`text-sm p-3 rounded-lg ${retrying ? "text-amber-700 bg-amber-50" : "text-red-600 bg-red-50"}`}>
                             {error}
+                            {retrying && (
+                                <button
+                                    type="button"
+                                    className="ml-2 underline font-medium"
+                                    onClick={() => { setRetrying(false); handleSubmit({ preventDefault: () => { } } as React.FormEvent); }}
+                                >
+                                    Retry now
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -165,26 +194,16 @@ export function LoginPage() {
                         className="group relative flex w-full justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
                     >
                         {loading
-                            ? isRegister
-                                ? "Creating..."
-                                : "Signing in..."
-                            : isRegister
-                            ? "Create Account"
-                            : "Sign in"}
+                            ? isRegister ? "Creating..." : "Signing in..."
+                            : isRegister ? "Create Account" : "Sign in"}
                         <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </button>
                 </form>
 
-                {/* Toggle Button */}
                 <p className="text-center text-sm text-gray-500">
-                    {isRegister
-                        ? "Already have an account?"
-                        : "Don't have an account?"}{" "}
+                    {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
                     <button
-                        onClick={() => {
-                            setError("");
-                            setIsRegister(!isRegister);
-                        }}
+                        onClick={() => { setError(""); setIsRegister(!isRegister); }}
                         className="text-primary font-medium hover:underline"
                     >
                         {isRegister ? "Sign in" : "Create one"}

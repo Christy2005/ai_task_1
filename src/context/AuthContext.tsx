@@ -1,49 +1,88 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { jwtDecode } from "jwt-decode";
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+interface DecodedToken {
+    id: number;
+    email: string;
+    role: "admin" | "faculty";
+    iat: number;
+    exp: number;
+}
 
 interface AuthContextType {
     isAuthenticated: boolean;
-    login: (email: string) => void;
+    user: DecodedToken | null;
+    token: string | null;
+    login: (token: string) => void;
     logout: () => void;
-    user: string | null;
 }
 
+// ─── Context ───────────────────────────────────────────────────────────────────
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [user, setUser] = useState<string | null>(null);
+// ─── Helper: decode token safely ──────────────────────────────────────────────
+function decodeToken(token: string): DecodedToken | null {
+    try {
+        const decoded = jwtDecode<DecodedToken>(token);
+        // Reject expired tokens
+        if (decoded.exp * 1000 < Date.now()) return null;
+        return decoded;
+    } catch {
+        return null;
+    }
+}
 
+// ─── Provider ─────────────────────────────────────────────────────────────────
+export function AuthProvider({ children }: { children: ReactNode }) {
+    const [user, setUser] = useState<DecodedToken | null>(null);
+    const [token, setToken] = useState<string | null>(null);
+
+    // Rehydrate from localStorage on app mount
     useEffect(() => {
-        // Check local storage on mount
-        const storedAuth = localStorage.getItem("isAuthenticated");
-        const storedUser = localStorage.getItem("user");
-        if (storedAuth === "true" && storedUser) {
-            setIsAuthenticated(true);
-            setUser(storedUser);
+        const storedToken = localStorage.getItem("token");
+        if (storedToken) {
+            const decoded = decodeToken(storedToken);
+            if (decoded) {
+                setToken(storedToken);
+                setUser(decoded);
+            } else {
+                // Token expired — clean up
+                localStorage.removeItem("token");
+            }
         }
     }, []);
 
-    const login = (email: string) => {
-        setIsAuthenticated(true);
-        setUser(email);
-        localStorage.setItem("isAuthenticated", "true");
-        localStorage.setItem("user", email);
+    const login = (newToken: string) => {
+        const decoded = decodeToken(newToken);
+        if (!decoded) return;
+        localStorage.setItem("token", newToken);
+        setToken(newToken);
+        setUser(decoded);
     };
 
     const logout = () => {
-        setIsAuthenticated(false);
+        localStorage.removeItem("token");
+        setToken(null);
         setUser(null);
-        localStorage.removeItem("isAuthenticated");
-        localStorage.removeItem("user");
     };
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, login, logout, user }}>
+        <AuthContext.Provider
+            value={{
+                isAuthenticated: !!user,
+                user,
+                token,
+                login,
+                logout,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );
 }
 
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useAuth() {
     const context = useContext(AuthContext);
     if (context === undefined) {
