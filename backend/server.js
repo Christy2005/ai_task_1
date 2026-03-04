@@ -24,14 +24,23 @@ app.use(helmet());
 app.use(compression());
 
 // CORS
+const allowedOrigins = process.env.ALLOWED_ORIGIN
+  ? process.env.ALLOWED_ORIGIN.split(",").map(o => o.trim())
+  : [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+  ];
+
 app.use(
   cors({
-    origin: process.env.ALLOWED_ORIGIN || "http://localhost:5173",
+    origin: allowedOrigins,
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
 
 // Body parsing
 app.use(express.json({ limit: "1mb" }));

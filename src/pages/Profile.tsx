@@ -11,11 +11,7 @@ interface UserProfile {
 
 export function Profile() {
     const [profile, setProfile] = React.useState<UserProfile>({
-        fullName: "",
-        email: "",
-        role: "",
-        phone: "",
-        location: ""
+        fullName: "", email: "", role: "", phone: "", location: ""
     });
     const [originalProfile, setOriginalProfile] = React.useState<UserProfile | null>(null);
     const [isEditing, setIsEditing] = React.useState(false);
@@ -32,7 +28,7 @@ export function Profile() {
             .catch(err => console.error('Error fetching profile:', err));
     }, []);
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setProfile(prev => ({ ...prev, [name]: value }));
         setIsEditing(true);
@@ -64,112 +60,103 @@ export function Profile() {
         }
     };
 
-    return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
+    const initials = profile.fullName
+        ? profile.fullName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
+        : "AD";
 
-            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-                <div className="h-32 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+    const inputClass = "flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium";
+    const fieldWrap = "flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all";
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-8">
+            <div>
+                <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                    My <span className="text-gradient-indigo">Profile</span>
+                </h1>
+                <p className="text-slate-500 mt-1">Manage your personal information and preferences.</p>
+            </div>
+
+            <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
+                {/* Cover banner */}
+                <div className="h-36 bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-400 relative">
+                    <div
+                        className="absolute inset-0 opacity-30"
+                        style={{ backgroundImage: "radial-gradient(circle at 30% 50%, rgba(255,255,255,0.3) 0%, transparent 60%)" }}
+                    />
+                </div>
+
                 <div className="px-8 pb-8">
-                    <div className="relative -mt-12 mb-6 flex items-end justify-between">
+                    {/* Avatar row */}
+                    <div className="relative -mt-14 mb-8 flex items-end justify-between">
                         <div className="relative">
-                            <div className="h-24 w-24 rounded-full bg-background p-1">
-                                <div className="h-full w-full rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                                    <User className="h-12 w-12 text-slate-400" />
-                                </div>
+                            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-indigo-300/40 border-4 border-white">
+                                {initials}
                             </div>
-                            <button className="absolute bottom-0 right-0 rounded-full bg-primary p-1.5 text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm">
+                            <button className="absolute -bottom-1 -right-1 w-9 h-9 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg hover:scale-110 transition-all">
                                 <Camera className="h-4 w-4" />
                             </button>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 mb-1">
                             <button
                                 onClick={handleCancel}
                                 disabled={!isEditing}
-                                className="rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50">
+                                className="px-5 py-2.5 rounded-2xl bg-white/60 border border-white/50 text-sm font-semibold text-slate-600 hover:bg-white/80 transition-all disabled:opacity-40"
+                            >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={!isEditing}
-                                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50">
+                                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-lg shadow-indigo-200/60 hover:scale-105 transition-all disabled:opacity-40 disabled:hover:scale-100"
+                            >
                                 Save Changes
                             </button>
                         </div>
                     </div>
 
+                    {/* Form grid */}
                     <div className="grid gap-8 md:grid-cols-2">
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold">Personal Information</h3>
+                        <div className="space-y-5">
+                            <h3 className="font-bold text-slate-800">Personal Information</h3>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                                    <div className="mt-1 flex items-center gap-2 rounded-md border border-border px-3 py-2">
-                                        <User className="h-4 w-4 text-muted-foreground" />
-                                        <input
-                                            name="fullName"
-                                            type="text"
-                                            value={profile.fullName || ""}
-                                            onChange={handleChange}
-                                            className="flex-1 bg-transparent text-sm focus:outline-none"
-                                        />
+                                    <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 block">Full Name</label>
+                                    <div className={fieldWrap}>
+                                        <User className="h-4 w-4 text-slate-400 shrink-0" />
+                                        <input name="fullName" type="text" value={profile.fullName || ""} onChange={handleChange} className={inputClass} placeholder="Your name" />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium text-muted-foreground">Email Address</label>
-                                    <div className="mt-1 flex items-center gap-2 rounded-md border border-border px-3 py-2">
-                                        <Mail className="h-4 w-4 text-muted-foreground" />
-                                        <input
-                                            name="email"
-                                            type="email"
-                                            value={profile.email || ""}
-                                            onChange={handleChange}
-                                            className="flex-1 bg-transparent text-sm focus:outline-none"
-                                        />
+                                    <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 block">Email Address</label>
+                                    <div className={fieldWrap}>
+                                        <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                                        <input name="email" type="email" value={profile.email || ""} onChange={handleChange} className={inputClass} placeholder="email@university.edu" />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium text-muted-foreground">Detailed Role</label>
-                                    <div className="mt-1 flex items-center gap-2 rounded-md border border-border px-3 py-2 bg-muted/50">
-                                        <input
-                                            name="role"
-                                            type="text"
-                                            value={profile.role || ""}
-                                            onChange={handleChange}
-                                            className="flex-1 bg-transparent text-sm focus:outline-none"
-                                        />
+                                    <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 block">Role</label>
+                                    <div className={fieldWrap}>
+                                        <input name="role" type="text" value={profile.role || ""} onChange={handleChange} className={inputClass} placeholder="e.g. Department Head" />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold">Contact Details</h3>
+                        <div className="space-y-5">
+                            <h3 className="font-bold text-slate-800">Contact Details</h3>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-sm font-medium text-muted-foreground">Phone Number</label>
-                                    <div className="mt-1 flex items-center gap-2 rounded-md border border-border px-3 py-2">
-                                        <Phone className="h-4 w-4 text-muted-foreground" />
-                                        <input
-                                            name="phone"
-                                            type="tel"
-                                            value={profile.phone || ""}
-                                            onChange={handleChange}
-                                            className="flex-1 bg-transparent text-sm focus:outline-none"
-                                        />
+                                    <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 block">Phone Number</label>
+                                    <div className={fieldWrap}>
+                                        <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                                        <input name="phone" type="tel" value={profile.phone || ""} onChange={handleChange} className={inputClass} placeholder="+1 (555) 000-0000" />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium text-muted-foreground">Office Location</label>
-                                    <div className="mt-1 flex items-center gap-2 rounded-md border border-border px-3 py-2">
-                                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                                        <input
-                                            name="location"
-                                            type="text"
-                                            value={profile.location || ""}
-                                            onChange={handleChange}
-                                            className="flex-1 bg-transparent text-sm focus:outline-none"
-                                        />
+                                    <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 block">Office Location</label>
+                                    <div className={fieldWrap}>
+                                        <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                                        <input name="location" type="text" value={profile.location || ""} onChange={handleChange} className={inputClass} placeholder="Room 204, Science Block" />
                                     </div>
                                 </div>
                             </div>

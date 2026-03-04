@@ -1,4 +1,4 @@
-import { Bell, Info, AlertTriangle, CheckCircle } from "lucide-react";
+import { Info, AlertTriangle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const notifications = [
@@ -28,55 +28,78 @@ const notifications = [
     },
 ];
 
+const typeConfig = {
+    success: {
+        icon: CheckCircle,
+        bg: "bg-gradient-to-br from-emerald-400 to-teal-500",
+        glow: "shadow-emerald-200/60",
+    },
+    warning: {
+        icon: AlertTriangle,
+        bg: "bg-gradient-to-br from-amber-400 to-orange-500",
+        glow: "shadow-amber-200/60",
+    },
+    info: {
+        icon: Info,
+        bg: "bg-gradient-to-br from-blue-400 to-indigo-500",
+        glow: "shadow-indigo-200/60",
+    },
+};
+
 export function Notifications() {
     return (
-        <div className="max-w-3xl mx-auto space-y-6">
+        <div className="max-w-3xl mx-auto space-y-8">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
-                <button className="text-sm text-primary hover:text-primary/80 font-medium">
+                <div>
+                    <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                        <span className="text-gradient-indigo">Notifications</span>
+                    </h1>
+                    <p className="text-slate-500 mt-1">Stay updated on tasks and meetings.</p>
+                </div>
+                <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors px-4 py-2 rounded-2xl hover:bg-white/60">
                     Mark all as read
                 </button>
             </div>
 
             <div className="space-y-4">
-                {notifications.map((notification) => (
-                    <div
-                        key={notification.id}
-                        className={cn(
-                            "flex items-start gap-4 p-4 rounded-lg border transition-colors",
-                            notification.read ? "bg-card border-border" : "bg-blue-50/50 border-blue-100"
-                        )}
-                    >
+                {notifications.map((notification) => {
+                    const config = typeConfig[notification.type as keyof typeof typeConfig];
+                    const Icon = config.icon;
+                    return (
                         <div
+                            key={notification.id}
                             className={cn(
-                                "mt-1 rounded-full p-2",
-                                notification.type === "success"
-                                    ? "bg-green-100 text-green-600"
-                                    : notification.type === "warning"
-                                        ? "bg-amber-100 text-amber-600"
-                                        : "bg-blue-100 text-blue-600"
+                                "glass-card glass-shadow rounded-[1.75rem] p-6 flex items-start gap-5 transition-all hover:scale-[1.01]",
+                                !notification.read && "ring-2 ring-indigo-200/60"
                             )}
                         >
-                            {notification.type === "success" && <CheckCircle className="h-4 w-4" />}
-                            {notification.type === "warning" && <AlertTriangle className="h-4 w-4" />}
-                            {notification.type === "info" && <Info className="h-4 w-4" />}
-                        </div>
-
-                        <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between">
-                                <p className={cn("font-medium", !notification.read && "text-blue-900")}>
-                                    {notification.title}
-                                </p>
-                                <span className="text-xs text-muted-foreground">{notification.time}</span>
+                            <div className={cn(
+                                "w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
+                                config.bg,
+                                config.glow
+                            )}>
+                                <Icon className="h-5 w-5 text-white" />
                             </div>
-                            <p className="text-sm text-muted-foreground">{notification.message}</p>
-                        </div>
 
-                        {!notification.read && (
-                            <div className="mt-2 h-2 w-2 rounded-full bg-blue-600" />
-                        )}
-                    </div>
-                ))}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-3 mb-1">
+                                    <p className={cn(
+                                        "font-bold text-sm",
+                                        !notification.read ? "text-slate-800" : "text-slate-600"
+                                    )}>
+                                        {notification.title}
+                                    </p>
+                                    <span className="text-xs text-slate-400 shrink-0">{notification.time}</span>
+                                </div>
+                                <p className="text-sm text-slate-500">{notification.message}</p>
+                            </div>
+
+                            {!notification.read && (
+                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0 mt-1.5 animate-pulse" />
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

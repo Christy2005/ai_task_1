@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Lock, Mail, ArrowRight, BookOpen, User } from "lucide-react";
+import { Lock, Mail, ArrowRight, Zap, User } from "lucide-react";
 
 export function LoginPage() {
     const [isRegister, setIsRegister] = useState(false);
@@ -36,32 +36,21 @@ export function LoginPage() {
 
             const response = await fetch(endpoint, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(bodyData),
             });
 
             const data = await response.json();
 
-            if (!response.ok) {
-                throw new Error(data.error || "Something went wrong");
-            }
+            if (!response.ok) throw new Error(data.error || "Something went wrong");
+            if (!data.token) throw new Error("No token received from server");
 
-            if (!data.token) {
-                throw new Error("No token received from server");
-            }
-
-            // Clear old auth
             localStorage.clear();
-
-            // Store JWT
             localStorage.setItem("token", data.token);
-
-            // Update context
+            localStorage.setItem("role", data.role ?? "faculty");
             login(email);
-
             navigate("/", { replace: true });
+
 
         } catch (err: any) {
             setError(err.message || "Something went wrong");
@@ -71,125 +60,117 @@ export function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen grid items-center justify-center bg-gray-50 p-4">
-            <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <div className="min-h-screen flex items-center justify-center p-4">
+            {/* Decorative blobs */}
+            <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
+                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-300/30 blur-[80px]" />
+                <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-pink-300/25 blur-[80px]" />
+                <div className="absolute top-[40%] left-[50%] w-[300px] h-[300px] rounded-full bg-purple-300/20 blur-[80px]" />
+            </div>
 
-                <div className="text-center space-y-2">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
-                        <BookOpen className="h-6 w-6" />
+            <div className="w-full max-w-md">
+                {/* Logo */}
+                <div className="text-center mb-8">
+                    <div className="inline-flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl rotate-12 shadow-xl shadow-indigo-300/40 flex items-center justify-center">
+                            <Zap className="h-6 w-6 text-white -rotate-12" />
+                        </div>
+                        <span className="text-3xl font-black text-gradient-indigo">SmartTask</span>
                     </div>
-                    <h2 className="text-3xl font-bold text-gray-900">
-                        {isRegister ? "Create Account" : "Welcome back"}
+                    <h2 className="text-2xl font-black text-slate-800">
+                        {isRegister ? "Create your account" : "Welcome back"}
                     </h2>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-slate-500 text-sm mt-1">
                         {isRegister
-                            ? "Register to access the Smart Task Dashboard"
-                            : "Sign in to the Smart Task Dashboard"}
+                            ? "Join the Smart Task Dashboard"
+                            : "Sign in to continue to your dashboard"}
                     </p>
                 </div>
 
-                <form className="space-y-6" onSubmit={handleSubmit}>
-                    <div className="space-y-4">
+                {/* Glass Card */}
+                <div className="glass-card-strong glass-shadow-lg rounded-[2rem] p-8 space-y-6">
+                    <form className="space-y-5" onSubmit={handleSubmit}>
 
-                        {/* Name field (only for register) */}
+                        {/* Name (register only) */}
                         {isRegister && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">
-                                    Full Name
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <User className="h-5 w-5 text-gray-400" />
-                                    </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Full Name</label>
+                                <div className="flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all">
+                                    <User className="h-4 w-4 text-slate-400 shrink-0" />
                                     <input
                                         type="text"
-                                        className="block w-full rounded-lg border border-gray-300 pl-10 py-2 text-gray-900"
                                         placeholder="John Doe"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
+                                        className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
                                     />
                                 </div>
                             </div>
                         )}
 
                         {/* Email */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">
-                                Email address
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-gray-400" />
-                                </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Email Address</label>
+                            <div className="flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all">
+                                <Mail className="h-4 w-4 text-slate-400 shrink-0" />
                                 <input
                                     type="email"
                                     required
-                                    className="block w-full rounded-lg border border-gray-300 pl-10 py-2 text-gray-900"
-                                    placeholder="doctor@university.edu"
+                                    placeholder="admin@university.edu"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
+                                    className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
                                 />
                             </div>
                         </div>
 
                         {/* Password */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">
-                                Password
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-gray-400" />
-                                </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Password</label>
+                            <div className="flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all">
+                                <Lock className="h-4 w-4 text-slate-400 shrink-0" />
                                 <input
                                     type="password"
                                     required
-                                    className="block w-full rounded-lg border border-gray-300 pl-10 py-2 text-gray-900"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
+                                    className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
                                 />
                             </div>
                         </div>
-                    </div>
 
-                    {error && (
-                        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
-                            {error}
-                        </div>
-                    )}
+                        {/* Error */}
+                        {error && (
+                            <div className="text-sm text-rose-600 bg-rose-50/80 border border-rose-100 rounded-2xl px-4 py-3">
+                                {error}
+                            </div>
+                        )}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="group relative flex w-full justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
-                    >
-                        {loading
-                            ? isRegister
-                                ? "Creating..."
-                                : "Signing in..."
-                            : isRegister
-                            ? "Create Account"
-                            : "Sign in"}
-                        <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                </form>
+                        {/* Submit */}
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-sm shadow-lg shadow-indigo-200/60 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        >
+                            {loading
+                                ? (isRegister ? "Creating account…" : "Signing in…")
+                                : (isRegister ? "Create Account" : "Sign In")}
+                            <ArrowRight className="h-4 w-4" />
+                        </button>
+                    </form>
 
-                {/* Toggle Button */}
-                <p className="text-center text-sm text-gray-500">
-                    {isRegister
-                        ? "Already have an account?"
-                        : "Don't have an account?"}{" "}
-                    <button
-                        onClick={() => {
-                            setError("");
-                            setIsRegister(!isRegister);
-                        }}
-                        className="text-primary font-medium hover:underline"
-                    >
-                        {isRegister ? "Sign in" : "Create one"}
-                    </button>
-                </p>
+                    {/* Toggle */}
+                    <p className="text-center text-sm text-slate-500">
+                        {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
+                        <button
+                            onClick={() => { setError(""); setIsRegister(!isRegister); }}
+                            className="text-indigo-600 font-bold hover:text-indigo-800 transition-colors"
+                        >
+                            {isRegister ? "Sign in" : "Create one"}
+                        </button>
+                    </p>
+                </div>
             </div>
         </div>
     );

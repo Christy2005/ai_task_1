@@ -174,6 +174,33 @@ router.patch("/me", verifyToken, async (req, res, next) => {
     next(error);
   }
 });
+/*
+========================
+  GET /faculty — Admin: list all faculty users with task counts
+========================
+*/
+router.get("/faculty", verifyToken, async (req, res, next) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
 
+    const { rows } = await pool.query(`
+      SELECT
+        u.id, u.name, u.email, u.department, u.phone,
+        COUNT(t.id) FILTER (WHERE t.status != 'completed') AS active_tasks
+      FROM users u
+      LEFT JOIN tasks t ON t.user_id = u.id
+      WHERE u.role = 'faculty'
+      GROUP BY u.id
+      ORDER BY u.name ASC
+    `);
+
+    return res.json({ faculty: rows });
+  } catch (error) {
+    logger.error("GET /faculty error:", error.message);
+    next(error);
+  }
+});
 
 export default router;

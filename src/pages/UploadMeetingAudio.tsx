@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { useTasks } from "@/context/TaskContext";
+import { useTasks, type TaskPriority } from "@/context/TaskContext";
+
+function toTaskPriority(val: string): TaskPriority {
+  if (val === "High" || val === "Low") return val;
+  return "Medium";
+}
 
 export function UploadMeetingAudio() {
   const [file, setFile] = useState<File | null>(null);
@@ -17,8 +22,12 @@ export function UploadMeetingAudio() {
 
     try {
       console.log("📤 Sending audio to backend...");
+      const token = localStorage.getItem("token");
       const res = await fetch("http://localhost:3000/api/ai/analyze-voice", {
         method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: formData,
       });
 
@@ -54,7 +63,7 @@ export function UploadMeetingAudio() {
         const title: string = task?.title || "Untitled Task";
         const assignee: string = task?.assignee || task?.assigned_to || "Unknown";
         const dueDate: string = task?.dueDate || task?.due_date || "";
-        const priority: string = task?.priority || "Medium";
+        const priority: TaskPriority = toTaskPriority(task?.priority || "Medium");
 
         console.log(`  Task[${idx}]:`, { title, assignee, dueDate, priority });
 
@@ -91,58 +100,66 @@ export function UploadMeetingAudio() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="p-6 bg-white rounded-lg shadow-md space-y-4">
-        <h2 className="text-xl font-bold">AI Meeting Transcriber</h2>
-        <input
-          type="file"
-          accept="audio/*,video/mp4"
-          onChange={(e) => e.target.files && setFile(e.target.files[0])}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+          Upload <span className="text-gradient-indigo">Audio</span>
+        </h1>
+        <p className="text-slate-500 mt-1">Transcribe meeting recordings and extract tasks with AI.</p>
+      </div>
+
+      {/* Upload Card */}
+      <div className="glass-card glass-shadow rounded-[2rem] p-8 space-y-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-200/50">
+            <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+          </div>
+          <h2 className="text-xl font-bold text-slate-800">AI Meeting Transcriber</h2>
+        </div>
+
+        {/* Drop Zone */}
+        <label className="flex flex-col items-center justify-center w-full h-40 rounded-3xl border-2 border-dashed border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 transition-colors cursor-pointer group">
+          <svg className="h-10 w-10 text-indigo-300 group-hover:text-indigo-400 mb-3 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+          <span className="text-sm font-semibold text-indigo-600">{file ? `📎 ${file.name}` : "Click to select audio file"}</span>
+          <span className="text-xs text-slate-400 mt-1">MP3, WAV, MP4 supported</span>
+          <input type="file" accept="audio/*,video/mp4" className="hidden" onChange={(e) => e.target.files && setFile(e.target.files[0])} />
+        </label>
+
         {file && (
           <button
             onClick={handleProcess}
             disabled={loading}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-400"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-base shadow-lg shadow-indigo-200/60 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            {loading ? "🤖 AI is thinking..." : "Extract Tasks"}
+            {loading ? "🤖 AI is analysing…" : "✨ Extract Tasks"}
           </button>
         )}
       </div>
 
+      {/* Transcript Result */}
       {transcript && (
-        <div className="p-6 bg-blue-50 rounded-lg shadow-md border-l-4 border-blue-500">
-          <h3 className="text-lg font-bold mb-3 text-blue-900">📝 Transcript</h3>
-          <p className="text-gray-700 bg-white p-4 rounded-md">{transcript}</p>
+        <div className="glass-card glass-shadow rounded-[2rem] p-8 border-l-4 border-indigo-400">
+          <h3 className="text-lg font-bold mb-4 text-indigo-800">📝 Transcript</h3>
+          <p className="text-slate-700 bg-white/60 p-5 rounded-2xl leading-relaxed">{transcript}</p>
         </div>
       )}
 
+      {/* Extracted Tasks */}
       {extractedTasks.length > 0 && (
-        <div className="p-6 bg-green-50 rounded-lg shadow-md border-l-4 border-green-500">
-          <h3 className="text-lg font-bold mb-4 text-green-900">✅ Extracted Tasks ({extractedTasks.length})</h3>
+        <div className="glass-card glass-shadow rounded-[2rem] p-8">
+          <h3 className="text-lg font-bold mb-5 text-emerald-800">✅ Extracted Tasks ({extractedTasks.length})</h3>
           <div className="space-y-3">
             {extractedTasks.map((task, index) => (
-              <div key={index} className="bg-white p-4 rounded-md shadow-sm border border-green-200">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 className="font-semibold text-gray-800">{task.title}</h4>
-                    <p className="text-sm text-gray-600">👤 Assignee: {task.assignee}</p>
-                  </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${task.priority === "High"
-                        ? "bg-red-100 text-red-800"
-                        : task.priority === "Medium"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
-                  >
-                    {task.priority}
-                  </span>
+              <div key={index} className="bg-white/60 p-5 rounded-2xl border border-emerald-100 flex justify-between items-start gap-4">
+                <div>
+                  <h4 className="font-semibold text-slate-800">{task.title}</h4>
+                  <p className="text-sm text-slate-500 mt-0.5">👤 {task.assignee}</p>
+                  {task.dueDate && <p className="text-xs text-slate-400 mt-1">📅 {task.dueDate}</p>}
                 </div>
-                {task.dueDate && (
-                  <p className="text-sm text-gray-600">📅 Due: {task.dueDate}</p>
-                )}
+                <span className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${task.priority === "High" ? "bg-red-100 text-red-700" : task.priority === "Medium" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                  {task.priority}
+                </span>
               </div>
             ))}
           </div>

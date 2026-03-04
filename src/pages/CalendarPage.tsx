@@ -1,71 +1,80 @@
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 export function CalendarPage() {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const dates = Array.from({ length: 35 }, (_, i) => i + 1 > 31 ? i + 1 - 31 : i + 1);
-
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
-                <button className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                <div>
+                    <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                        My <span className="text-gradient-indigo">Calendar</span>
+                    </h1>
+                    <p className="text-slate-500 mt-1">Schedule and manage meetings and events.</p>
+                </div>
+                <button className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-lg shadow-indigo-200/60 hover:scale-105 transition-all">
                     <Plus className="h-4 w-4" />
                     Add Event
                 </button>
             </div>
 
-            <div className="rounded-xl border border-border bg-card shadow-sm">
-                <div className="flex items-center justify-between border-b border-border p-4">
-                    <h2 className="font-semibold">January 2026</h2>
+            <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
+                {/* Month header */}
+                <div className="flex items-center justify-between px-7 py-5 border-b border-white/40">
+                    <h2 className="font-bold text-slate-800 text-base">January 2026</h2>
                     <div className="flex items-center gap-2">
-                        <button className="rounded-md p-1 hover:bg-muted">
+                        <button className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/60 hover:text-indigo-600 transition-all">
                             <ChevronLeft className="h-5 w-5" />
                         </button>
-                        <button className="rounded-md p-1 hover:bg-muted">
+                        <button className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/60 hover:text-indigo-600 transition-all">
                             <ChevronRight className="h-5 w-5" />
                         </button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-7 border-b border-border text-center text-xs font-medium text-muted-foreground">
-                    {days.map((day) => (
-                        <div key={day} className="py-2">
-                            {day}
-                        </div>
+                {/* Day labels */}
+                <div className="grid grid-cols-7 border-b border-white/30 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                        <div key={day} className="py-3">{day}</div>
                     ))}
                 </div>
 
+                {/* Calendar grid */}
                 <div className="grid grid-cols-7 text-sm">
-                    {/* Simple grid for demo purposes. In a real app, this would need proper date logic */}
+                    {/* Leading empty cells */}
                     {[...Array(5)].map((_, i) => (
-                        <div key={`empty-${i}`} className="min-h-[100px] border-b border-r border-border bg-muted/20 p-2" />
+                        <div key={`empty-start-${i}`} className="min-h-[90px] border-b border-r border-white/20 bg-white/10 p-2" />
                     ))}
+
+                    {/* Date cells */}
                     {[...Array(26)].map((_, i) => (
                         <div
                             key={i}
-                            className="group relative min-h-[100px] border-b border-r border-border p-2 hover:bg-muted/30 transition-colors"
+                            className="group relative min-h-[90px] border-b border-r border-white/20 p-2 hover:bg-white/40 transition-colors"
                         >
-                            <span className="font-medium text-muted-foreground group-hover:text-foreground">
+                            <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors ${i === 12
+                                    ? "bg-indigo-500 text-white"
+                                    : "text-slate-600 group-hover:text-indigo-700"
+                                }`}>
                                 {i + 1}
                             </span>
                             {i === 12 && (
-                                <div className="mt-1 rounded bg-blue-100 p-1 text-xs text-blue-700">
-                                    <span className="font-semibold block">2:00 PM</span>
+                                <div className="mt-1.5 rounded-xl bg-indigo-100 px-2 py-1 text-xs text-indigo-700">
+                                    <span className="font-bold block">2:00 PM</span>
                                     Dept Meeting
                                 </div>
                             )}
                             {i === 24 && (
-                                <div className="mt-1 rounded bg-emerald-100 p-1 text-xs text-emerald-700">
-                                    <span className="font-semibold block">10:00 AM</span>
+                                <div className="mt-1.5 rounded-xl bg-emerald-100 px-2 py-1 text-xs text-emerald-700">
+                                    <span className="font-bold block">10:00 AM</span>
                                     Guest Lecture
                                 </div>
                             )}
                         </div>
                     ))}
-                    {[...Array(4)].map((_, i) => (
-                        <div key={`empty-end-${i}`} className="min-h-[100px] border-b border-r border-border bg-muted/20 p-2" />
-                    ))}
 
+                    {/* Trailing empty cells */}
+                    {[...Array(4)].map((_, i) => (
+                        <div key={`empty-end-${i}`} className="min-h-[90px] border-r border-white/20 bg-white/10 p-2" />
+                    ))}
                 </div>
             </div>
         </div>
