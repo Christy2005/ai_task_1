@@ -287,13 +287,15 @@
   .faculty-row,
   [class*="bg-gray-"],
   [class*="bg-slate-"] {
-    color: #1E1B4B !important; /* Deep Midnight Purple */
+    color: #1E1B4B !important;
+    /* Deep Midnight Purple */
   }
 
   /* 2. Specific emphasis for task and transcript text */
   .task-title,
   .transcript-text {
-    color: #000000 !important; /* Pure Black */
+    color: #000000 !important;
+    /* Pure Black */
     font-weight: 600;
   }
 
@@ -301,6 +303,29 @@
   h1,
   h2,
   .sidebar-link {
-    color: #F8FAFC !important; /* Off-white */
+    color: #F8FAFC !important;
+    /* Off-white */
+  }
+
+  /* ── High-contrast Midnight-Purple button (Assign Task) ── */
+  .btn-assign {
+    background-color: #1E1B4B;
+    color: #FFFFFF;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    transition: all 0.3s ease;
+  }
+
+  .btn-assign:hover {
+    background-color: #2E1065;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(30, 27, 75, 0.4);
+  }
+
+  /* ── Modal heading — readable dark purple on white card ── */
+  .modal-heading {
+    color: #1E1B4B !important;
+    font-size: 1.5rem;
+    font-weight: 900;
   }
 }

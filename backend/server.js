@@ -10,6 +10,8 @@ import authRoutes from "./routes/authRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import logger from "./utils/logger.js";
+import pool from "./database.js";
+import { verifyToken, requireRole } from "./middleware/authMiddleware.js";
 
 const app = express();
 
@@ -61,6 +63,42 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/tasks", taskRoutes);
+
+/* =============================
+   Admin: Assign Task (alias)
+   POST /api/admin/assign-task
+   🛡️ Admin-only — JWT required
+============================= */
+app.post("/api/admin/assign-task", verifyToken, requireRole("admin"), async (req, res, next) => {
+  try {
+    const { facultyId, title, deadline, priority = "Medium" } = req.body;
+
+    if (!title) return res.status(400).json({ error: "Title is required" });
+    if (!facultyId) return res.status(400).json({ error: "facultyId is required" });
+
+    // Verify the target user is a faculty member
+    const assigneeCheck = await pool.query(
+      "SELECT id FROM users WHERE id = $1 AND role = 'faculty'",
+      [facultyId]
+    );
+    if (assigneeCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Faculty user not found" });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO tasks (title, status, priority, due_date, user_id, created_by)
+       VALUES ($1, 'pending', $2, $3, $4, $5)
+       RETURNING *`,
+      [title, priority, deadline || null, facultyId, req.user.id]
+    );
+
+    logger.info(`[admin/assign-task] "${title}" → faculty ${facultyId} by admin ${req.user.id}`);
+    res.status(201).json({ message: "Task assigned successfully", task: rows[0] });
+  } catch (err) {
+    logger.error("[admin/assign-task] DB error:", err.message);
+    next(err);
+  }
+});
 
 /* =============================
    404 Handler
