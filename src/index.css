@@ -328,4 +328,25 @@
     font-size: 1.5rem;
     font-weight: 900;
   }
+
+  /* ── Light pods on dark background: force dark text ── */
+  .glass-card-content {
+    color: #1E1B4B !important;
+  }
+
+  /* ── Deep-purple gradient primary button (e.g. Upload) ── */
+  .btn-primary-purple {
+    background: linear-gradient(135deg, #4C1D95 0%, #1E1B4B 100%);
+    color: white;
+    font-weight: 800;
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 10px 15px -3px rgba(76, 29, 149, 0.4);
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary-purple:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+  }
 }
