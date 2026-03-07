@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useTasks, type TaskPriority } from "@/context/TaskContext";
+import { useAuth } from "@/context/AuthContext";
+import { Download } from "lucide-react";
 import ExtractedTaskList from "@/components/ai/ExtractedTaskList";
 import { Toast } from "@/components/ui/Toast";
+import { generateMeetingPDF } from "@/utils/exportPdf";
 
 function toTaskPriority(val: string): TaskPriority {
   if (val === "High" || val === "Low") return val;
@@ -15,6 +18,9 @@ export function UploadMeetingAudio() {
   const [extractedTasks, setExtractedTasks] = useState<any[]>([]);
   const [showToast, setShowToast] = useState(false);
   const { addTask } = useTasks();
+  const { role } = useAuth();
+  // PDF title — can be extended to a user-editable field later
+  const meetingTitle = "General Discussion";
 
   const triggerToast = () => {
     setShowToast(true);
@@ -157,6 +163,19 @@ export function UploadMeetingAudio() {
 
       {/* Extracted Tasks */}
       <ExtractedTaskList tasks={extractedTasks} />
+
+      {/* PDF Export — admin only, shown after tasks are extracted */}
+      {extractedTasks.length > 0 && role === "admin" && (
+        <div className="flex justify-end mt-2">
+          <button
+            onClick={() => generateMeetingPDF(meetingTitle || "General Discussion", extractedTasks)}
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white font-black hover:bg-white/20 transition-all shadow-lg"
+          >
+            <Download size={17} className="text-indigo-400" />
+            Download Minutes (PDF)
+          </button>
+        </div>
+      )}
 
       {/* Glass Toast — appears on successful AI extraction */}
       {showToast && (
