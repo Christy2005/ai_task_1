@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTasks, type TaskPriority } from "@/context/TaskContext";
 import ExtractedTaskList from "@/components/ai/ExtractedTaskList";
+import { Toast } from "@/components/ui/Toast";
 
 function toTaskPriority(val: string): TaskPriority {
   if (val === "High" || val === "Low") return val;
@@ -12,7 +13,13 @@ export function UploadMeetingAudio() {
   const [loading, setLoading] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [extractedTasks, setExtractedTasks] = useState<any[]>([]);
+  const [showToast, setShowToast] = useState(false);
   const { addTask } = useTasks();
+
+  const triggerToast = () => {
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 5000);
+  };
 
   const handleProcess = async () => {
     if (!file) return alert("Please select a file.");
@@ -88,7 +95,7 @@ export function UploadMeetingAudio() {
       if (normalizedTasks.length === 0) {
         alert("Processing complete. No tasks were extracted from this audio.");
       } else {
-        alert(`Success! Extracted ${normalizedTasks.length} task${normalizedTasks.length === 1 ? "" : "s"}.`);
+        triggerToast(); // ✅ show glass toast — JWT accepted, Neon synced
       }
 
       setFile(null);
@@ -150,6 +157,14 @@ export function UploadMeetingAudio() {
 
       {/* Extracted Tasks */}
       <ExtractedTaskList tasks={extractedTasks} />
+
+      {/* Glass Toast — appears on successful AI extraction */}
+      {showToast && (
+        <Toast
+          message={`AI Analysis Complete! ${extractedTasks.length} task${extractedTasks.length === 1 ? "" : "s"} assigned to Faculty.`}
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </div>
   );
 }
