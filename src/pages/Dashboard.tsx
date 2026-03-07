@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useTasks } from "@/context/TaskContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import TaskProgressChart from "@/components/dashboard/TaskProgressChart";
 
 export function Dashboard() {
     const { tasks } = useTasks();
@@ -167,6 +168,9 @@ export function Dashboard() {
                     </div>
                 ))}
             </div>
+
+            {/* ── Task Progress Chart ── */}
+            <TaskProgressChart />
 
             {/* ── Bottom Grid ── */}
             <div className="grid gap-6 md:grid-cols-2">

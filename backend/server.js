@@ -101,6 +101,40 @@ app.post("/api/admin/assign-task", verifyToken, requireRole("admin"), async (req
 });
 
 /* =============================
+   Admin: Task Stats for Chart
+   GET /api/admin/task-stats
+   🛡️ Admin-only — JWT required
+============================= */
+app.get("/api/admin/task-stats", verifyToken, requireRole("admin"), async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        COALESCE(SPLIT_PART(u.name, ' ', 1), u.email) AS name,
+        COUNT(t.id) FILTER (WHERE t.status = 'completed') AS completed,
+        COUNT(t.id) FILTER (WHERE t.status != 'completed') AS pending
+      FROM users u
+      LEFT JOIN tasks t ON t.user_id = u.id
+      WHERE u.role = 'faculty'
+      GROUP BY u.id, u.name, u.email
+      ORDER BY (COUNT(t.id)) DESC
+      LIMIT 8
+    `);
+
+    // Cast counts to numbers
+    const data = rows.map((r) => ({
+      name: r.name,
+      completed: Number(r.completed),
+      pending: Number(r.pending),
+    }));
+
+    res.json(data);
+  } catch (err) {
+    logger.error("[admin/task-stats] DB error:", err.message);
+    next(err);
+  }
+});
+
+/* =============================
    404 Handler
 ============================= */
 
