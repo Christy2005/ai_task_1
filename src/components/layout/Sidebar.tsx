@@ -94,7 +94,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             onClick={() => { if (window.innerWidth < 1024) onClose(); }}
                             className={({ isActive }) =>
                                 cn(
-                                    "flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200",
+                                    "sidebar-link flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200",
                                     isActive
                                         ? "glass-nav-active text-indigo-700 shadow-sm"
                                         : "text-slate-400 hover:bg-[#EDE9FE] hover:text-[#3B0764]"

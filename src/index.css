@@ -279,4 +279,28 @@
   .hover\:bg-violet-50:hover svg {
     color: #3B0764 !important;
   }
+
+  /* ── High-contrast typography tweaks ── */
+  /* 1. Dark text for light containers (including transcript + task cards) */
+  .transcript-box,
+  .task-card,
+  .faculty-row,
+  [class*="bg-gray-"],
+  [class*="bg-slate-"] {
+    color: #1E1B4B !important; /* Deep Midnight Purple */
+  }
+
+  /* 2. Specific emphasis for task and transcript text */
+  .task-title,
+  .transcript-text {
+    color: #000000 !important; /* Pure Black */
+    font-weight: 600;
+  }
+
+  /* 3. Keep headers + sidebar links bright on dark background */
+  h1,
+  h2,
+  .sidebar-link {
+    color: #F8FAFC !important; /* Off-white */
+  }
 }

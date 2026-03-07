@@ -141,7 +141,9 @@ export function UploadMeetingAudio() {
       {transcript && (
         <div className="glass-card glass-shadow rounded-[2rem] p-8 border-l-4 border-indigo-400">
           <h3 className="text-lg font-bold mb-4 text-indigo-800">📝 Transcript</h3>
-          <p className="text-slate-700 bg-white/60 p-5 rounded-2xl leading-relaxed">{transcript}</p>
+          <p className="transcript-box transcript-text text-slate-700 bg-white/60 p-5 rounded-2xl leading-relaxed">
+            {transcript}
+          </p>
         </div>
       )}
 
@@ -151,9 +153,12 @@ export function UploadMeetingAudio() {
           <h3 className="text-lg font-bold mb-5 text-emerald-800">✅ Extracted Tasks ({extractedTasks.length})</h3>
           <div className="space-y-3">
             {extractedTasks.map((task, index) => (
-              <div key={index} className="bg-white/60 p-5 rounded-2xl border border-emerald-100 flex justify-between items-start gap-4">
+              <div
+                key={index}
+                className="task-card bg-white/60 p-5 rounded-2xl border border-emerald-100 flex justify-between items-start gap-4"
+              >
                 <div>
-                  <h4 className="font-semibold text-slate-800">{task.title}</h4>
+                  <h4 className="task-title font-semibold text-slate-800">{task.title}</h4>
                   <p className="text-sm text-slate-500 mt-0.5">👤 {task.assignee}</p>
                   {task.dueDate && <p className="text-xs text-slate-400 mt-1">📅 {task.dueDate}</p>}
                 </div>
