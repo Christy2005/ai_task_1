@@ -5,10 +5,10 @@ export function CalendarPage() {
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                    <h1 className="text-4xl font-black text-foreground tracking-tight">
                         My <span className="text-gradient-indigo">Calendar</span>
                     </h1>
-                    <p className="text-slate-500 mt-1">Schedule and manage meetings and events.</p>
+                    <p className="text-muted-foreground mt-1">Schedule and manage meetings and events.</p>
                 </div>
                 <button className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-lg shadow-indigo-200/60 hover:scale-105 transition-all">
                     <Plus className="h-4 w-4" />
@@ -19,7 +19,7 @@ export function CalendarPage() {
             <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
                 {/* Month header */}
                 <div className="flex items-center justify-between px-7 py-5 border-b border-white/40">
-                    <h2 className="font-bold text-slate-800 text-base">January 2026</h2>
+                    <h2 className="font-bold text-foreground text-base">January 2026</h2>
                     <div className="flex items-center gap-2">
                         <button className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/60 hover:text-indigo-600 transition-all">
                             <ChevronLeft className="h-5 w-5" />
@@ -51,8 +51,8 @@ export function CalendarPage() {
                             className="group relative min-h-[90px] border-b border-r border-white/20 p-2 hover:bg-white/40 transition-colors"
                         >
                             <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors ${i === 12
-                                    ? "bg-indigo-500 text-white"
-                                    : "text-slate-600 group-hover:text-indigo-700"
+                                ? "bg-indigo-500 text-white"
+                                : "text-slate-600 group-hover:text-indigo-700"
                                 }`}>
                                 {i + 1}
                             </span>

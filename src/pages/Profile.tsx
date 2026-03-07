@@ -64,16 +64,16 @@ export function Profile() {
         ? profile.fullName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
         : "AD";
 
-    const inputClass = "flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium";
+    const inputClass = "flex-1 bg-transparent text-sm text-foreground placeholder-slate-400 focus:outline-none font-medium";
     const fieldWrap = "flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all";
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <div>
-                <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                <h1 className="text-4xl font-black text-foreground tracking-tight">
                     My <span className="text-gradient-indigo">Profile</span>
                 </h1>
-                <p className="text-slate-500 mt-1">Manage your personal information and preferences.</p>
+                <p className="text-muted-foreground mt-1">Manage your personal information and preferences.</p>
             </div>
 
             <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
@@ -117,7 +117,7 @@ export function Profile() {
                     {/* Form grid */}
                     <div className="grid gap-8 md:grid-cols-2">
                         <div className="space-y-5">
-                            <h3 className="font-bold text-slate-800">Personal Information</h3>
+                            <h3 className="font-bold text-foreground">Personal Information</h3>
                             <div className="space-y-3">
                                 <div>
                                     <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 block">Full Name</label>
@@ -143,7 +143,7 @@ export function Profile() {
                         </div>
 
                         <div className="space-y-5">
-                            <h3 className="font-bold text-slate-800">Contact Details</h3>
+                            <h3 className="font-bold text-foreground">Contact Details</h3>
                             <div className="space-y-3">
                                 <div>
                                     <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 block">Phone Number</label>

@@ -98,26 +98,26 @@ export function Dashboard() {
             {/* ── Desktop Page Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-800 tracking-tight leading-tight">
+                    <h1 className="text-4xl font-black text-foreground tracking-tight leading-tight">
                         Dashboard{" "}
                         <span className="text-gradient-indigo">Overview</span>
                     </h1>
-                    <p className="text-slate-500 mt-1">
+                    <p className="text-muted-foreground mt-1">
                         Welcome back,{" "}
-                        <span className="font-bold text-indigo-600">{user ?? "admin@gmail.com"}</span>
+                        <span className="font-bold text-accent-indigo">{user ?? "admin@gmail.com"}</span>
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate("/notifications")}
-                        className="glass-card glass-shadow rounded-2xl p-3 text-slate-500 hover:text-indigo-600 transition-all hover:scale-105 relative"
+                        className="glass-card glass-shadow rounded-2xl p-3 text-muted-foreground hover:text-accent-indigo transition-all hover:scale-105 relative"
                     >
                         <Bell className="h-5 w-5" />
                         <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-rose-500" />
                     </button>
                     <div className="glass-card glass-shadow rounded-2xl px-5 py-2.5 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-indigo-400" />
-                        <span className="text-sm font-bold text-indigo-700">Admin</span>
+                        <Sparkles className="h-4 w-4 text-accent-purple" />
+                        <span className="text-sm font-bold text-accent-indigo">Admin</span>
                     </div>
                 </div>
             </div>
@@ -148,11 +148,11 @@ export function Dashboard() {
                         >
                             <stat.icon className="h-6 w-6 text-white" />
                         </div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
+                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">
                             {stat.name}
                         </p>
                         <div className="flex items-baseline gap-2">
-                            <p className="text-5xl font-black text-slate-800">{stat.value}</p>
+                            <p className="text-5xl font-black text-foreground">{stat.value}</p>
                             <span
                                 className={cn(
                                     "flex items-center text-xs font-semibold",

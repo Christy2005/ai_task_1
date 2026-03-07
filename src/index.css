@@ -1,39 +1,57 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
+:root {
+  /* ── Light Palette (Day) ── */
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #F1F5F9;
+  --text-primary: #1E1B4B;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(30, 27, 75, 0.1);
+  --glass-shadow: 0 8px 32px rgba(30, 27, 75, 0.1);
+}
+
+.dark {
+  /* ── Dark Palette (Night) ── */
+  --bg-primary: #090317;
+  --bg-secondary: #110C1D;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --glass-bg: rgba(139, 92, 246, 0.10);
+  --glass-border: rgba(167, 139, 250, 0.20);
+  --glass-shadow: 0 8px 32px rgba(139, 92, 246, 0.22);
+}
+
 @theme {
   /* ── Glass Palette ── */
-  --color-glass-bg: #090317;
-  --color-glass-card: rgba(139, 92, 246, 0.10);
-  --color-glass-border: rgba(167, 139, 250, 0.20);
+  --color-glass-bg: var(--bg-primary);
+  --color-glass-card: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
   --color-accent-purple: #A78BFA;
   --color-accent-pink: #F472B6;
   --color-accent-indigo: #818CF8;
 
-  /* ── Semantic Tokens (dark-purple) ── */
-  --color-border: rgba(167, 139, 250, 0.18);
+  /* ── Semantic Tokens ── */
+  --color-border: var(--glass-border);
   --color-input: rgba(139, 92, 246, 0.15);
   --color-ring: #A78BFA;
-  --color-background: #090317;
-  --color-foreground: #F8FAFC;
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
 
   --color-primary: #818CF8;
   --color-primary-foreground: #ffffff;
 
-  --color-secondary: rgba(139, 92, 246, 0.20);
-  --color-secondary-foreground: #EDE9FE;
+  --color-secondary: var(--bg-secondary);
+  --color-secondary-foreground: var(--text-secondary);
 
-  --color-destructive: #F43F5E;
-  --color-destructive-foreground: #ffffff;
+  --color-muted: var(--bg-secondary);
+  --color-muted-foreground: var(--text-muted);
 
-  --color-muted: rgba(139, 92, 246, 0.15);
-  --color-muted-foreground: #94A3B8;
-
-  --color-accent: rgba(139, 92, 246, 0.15);
-  --color-accent-foreground: #C4B5FD;
-
-  --color-card: rgba(139, 92, 246, 0.10);
-  --color-card-foreground: #F8FAFC;
+  --color-card: var(--glass-bg);
+  --color-card-foreground: var(--text-primary);
 
   /* ── Border Radius ── */
   --radius-sm: 0.5rem;
@@ -48,9 +66,6 @@
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
-/* ─────────────────────────────────────────────
-   Base
-───────────────────────────────────────────── */
 @layer base {
   * {
     box-sizing: border-box;
@@ -66,40 +81,38 @@
 
   body {
     min-height: 100vh;
-    background: #090317;
-    color: #F8FAFC;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
-
-  /* ── Nixio / Alexandra typography — violet-tinted dark theme ── */
-  /* Primary headings: bright soft-violet, ultra-bold for commanding presence */
+  /* ── Typography — Theme Aware ── */
   h1 {
-    color: #EDE9FE;
+    color: var(--text-primary);
     font-weight: 900;
     letter-spacing: -0.02em;
   }
 
   h2,
   h3 {
-    color: #DDD6FE;
+    color: var(--text-primary);
     font-weight: 800;
   }
 
   h4,
   h5,
   h6 {
-    color: #C4B5FD;
+    color: var(--text-secondary);
     font-weight: 700;
   }
 
-  /* Body text: muted violet — readable, sophisticated */
   p {
-    color: #A89BC2;
+    color: var(--text-muted);
+    line-height: 1.6;
   }
 
-  /* Labels / form descriptors: medium violet */
   label {
-    color: #C4B5FD;
+    color: var(--text-secondary);
     font-weight: 600;
     font-size: 0.75rem;
     letter-spacing: 0.06em;
@@ -108,12 +121,14 @@
 
   input,
   textarea {
-    color: #EDE9FE;
+    color: var(--text-primary);
+    background: transparent;
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: #6D5A8A;
+    color: var(--text-muted);
+    opacity: 0.5;
   }
 
   #root {
@@ -127,42 +142,19 @@
 ───────────────────────────────────────────── */
 @layer utilities {
   .glass-card {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--glass-bg);
     backdrop-filter: blur(24px) saturate(160%);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
   }
 
   .glass-card-strong {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--glass-bg);
     backdrop-filter: blur(36px) saturate(180%);
     -webkit-backdrop-filter: blur(36px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.40);
-  }
-
-  .glass-nav-active {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(167, 139, 250, 0.20) 100%);
-    color: #EDE9FE;
-  }
-
-  .glass-shadow {
-    box-shadow:
-      0 8px 32px rgba(139, 92, 246, 0.22),
-      0 2px 8px rgba(0, 0, 0, 0.40),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  }
-
-  .glass-shadow-lg {
-    box-shadow:
-      0 20px 60px rgba(139, 92, 246, 0.30),
-      0 8px 24px rgba(0, 0, 0, 0.50),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
-  }
-
-  .glow-purple {
-    box-shadow: 0 0 40px rgba(139, 92, 246, 0.50);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
   }
 
   .text-gradient-indigo {
@@ -172,181 +164,129 @@
     background-clip: text;
   }
 
-  /* ── Light containers need dark text ── */
-  /* Transcript box, extracted task cards use bg-white/60 on dark bg */
-  /* We scope dark text ONLY inside these lighter boxes */
-  .light-container,
-  .bg-white\/60,
-  .bg-white\/80 {
-    color: #1E1B4B !important;
+  /* ── Legacy Override Support ── */
+  .text-slate-800,
+  .text-slate-900 {
+    color: var(--text-primary) !important;
   }
 
-  .light-container h1,
-  .light-container h2,
-  .light-container h3,
-  .light-container h4,
-  .light-container p,
-  .light-container span,
-  .bg-white\/60 *,
-  .bg-white\/80 * {
-    color: #1E1B4B !important;
-    -webkit-text-fill-color: #1E1B4B !important;
-  }
-
-
-  /* ── Dark-mode Tailwind text overrides ── */
-  /* Headings / primary text → bright white */
-  .text-slate-800 {
-    color: #F1F5F9 !important;
-  }
-
-  .text-slate-700 {
-    color: #E2E8F0 !important;
-  }
-
-  /* Body / secondary → soft readable slate */
+  .text-slate-500,
   .text-slate-600 {
-    color: #CBD5E1 !important;
+    color: var(--text-secondary) !important;
   }
 
-  /* Muted labels → medium violet */
-  .text-slate-500 {
-    color: #94A3B8 !important;
-  }
-
-  /* Captions / placeholders → dim but legible */
   .text-slate-400 {
-    color: #64748B !important;
+    color: var(--text-muted) !important;
   }
 
-  /* Indigo accent text on dark */
+  .text-indigo-600,
   .text-indigo-700 {
-    color: #C4B5FD !important;
-  }
-
-  .text-indigo-600 {
-    color: #A78BFA !important;
-  }
-
-  .text-indigo-500 {
     color: #818CF8 !important;
+    /* Keep indigo vivid */
   }
+}
 
-  /* Rose stays vivid */
-  .text-rose-600 {
-    color: #FB7185 !important;
-  }
+/* ── Global light-purple hover scheme ── */
+/* Covers any element using common Tailwind hover-bg utilities */
+.hover\:bg-white\/60:hover,
+.hover\:bg-white\/80:hover,
+.hover\:bg-white\/40:hover,
+.hover\:bg-white\/10:hover,
+.hover\:bg-white:hover,
+.hover\:bg-gray-50:hover,
+.hover\:bg-gray-100:hover,
+.hover\:bg-slate-50:hover,
+.hover\:bg-slate-100:hover,
+.hover\:bg-indigo-50:hover,
+.hover\:bg-purple-50:hover,
+.hover\:bg-violet-50:hover {
+  background-color: #EDE9FE !important;
+  color: #3B0764 !important;
+}
 
-  .text-rose-400 {
-    color: #FDA4AF !important;
-  }
+/* Cards and boxes that use opacity-based hover */
+.hover\:bg-white\/5:hover,
+.hover\:bg-white\/8:hover,
+.hover\:bg-white\/10:hover {
+  background-color: #EDE9FE !important;
+  color: #3B0764 !important;
+}
 
-  /* ── Global light-purple hover scheme ── */
-  /* Covers any element using common Tailwind hover-bg utilities */
-  .hover\:bg-white\/60:hover,
-  .hover\:bg-white\/80:hover,
-  .hover\:bg-white\/40:hover,
-  .hover\:bg-white\/10:hover,
-  .hover\:bg-white:hover,
-  .hover\:bg-gray-50:hover,
-  .hover\:bg-gray-100:hover,
-  .hover\:bg-slate-50:hover,
-  .hover\:bg-slate-100:hover,
-  .hover\:bg-indigo-50:hover,
-  .hover\:bg-purple-50:hover,
-  .hover\:bg-violet-50:hover {
-    background-color: #EDE9FE !important;
-    color: #3B0764 !important;
-  }
+/* Icon children inside hovered elements inherit dark colour */
+.hover\:bg-white\/60:hover svg,
+.hover\:bg-white\/80:hover svg,
+.hover\:bg-white\/40:hover svg,
+.hover\:bg-gray-50:hover svg,
+.hover\:bg-slate-50:hover svg,
+.hover\:bg-slate-100:hover svg,
+.hover\:bg-indigo-50:hover svg,
+.hover\:bg-purple-50:hover svg,
+.hover\:bg-violet-50:hover svg {
+  color: #3B0764 !important;
+}
 
-  /* Cards and boxes that use opacity-based hover */
-  .hover\:bg-white\/5:hover,
-  .hover\:bg-white\/8:hover,
-  .hover\:bg-white\/10:hover {
-    background-color: #EDE9FE !important;
-    color: #3B0764 !important;
-  }
+/* 1. Dark text for light containers (legacy support) */
+.transcript-box,
+.task-card,
+.faculty-row {
+  color: var(--text-primary) !important;
+}
 
-  /* Icon children inside hovered elements inherit dark colour */
-  .hover\:bg-white\/60:hover svg,
-  .hover\:bg-white\/80:hover svg,
-  .hover\:bg-white\/40:hover svg,
-  .hover\:bg-gray-50:hover svg,
-  .hover\:bg-slate-50:hover svg,
-  .hover\:bg-slate-100:hover svg,
-  .hover\:bg-indigo-50:hover svg,
-  .hover\:bg-purple-50:hover svg,
-  .hover\:bg-violet-50:hover svg {
-    color: #3B0764 !important;
-  }
+/* 2. Specific emphasis for task and transcript text */
+.task-title,
+.transcript-text {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
 
-  /* ── High-contrast typography tweaks ── */
-  /* 1. Dark text for light containers (including transcript + task cards) */
-  .transcript-box,
-  .task-card,
-  .faculty-row,
-  [class*="bg-gray-"],
-  [class*="bg-slate-"] {
-    color: #1E1B4B !important;
-    /* Deep Midnight Purple */
-  }
+/* 3. Global Headings */
+h1,
+h2,
+h3,
+.sidebar-link {
+  color: var(--text-primary) !important;
+}
 
-  /* 2. Specific emphasis for task and transcript text */
-  .task-title,
-  .transcript-text {
-    color: #000000 !important;
-    /* Pure Black */
-    font-weight: 600;
-  }
 
-  /* 3. Keep headers + sidebar links bright on dark background */
-  h1,
-  h2,
-  .sidebar-link {
-    color: #F8FAFC !important;
-    /* Off-white */
-  }
+/* ── High-contrast Midnight-Purple button (Assign Task) ── */
+.btn-assign {
+  background-color: #1E1B4B;
+  color: #FFFFFF;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  transition: all 0.3s ease;
+}
 
-  /* ── High-contrast Midnight-Purple button (Assign Task) ── */
-  .btn-assign {
-    background-color: #1E1B4B;
-    color: #FFFFFF;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-    transition: all 0.3s ease;
-  }
+.btn-assign:hover {
+  background-color: #2E1065;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(30, 27, 75, 0.4);
+}
 
-  .btn-assign:hover {
-    background-color: #2E1065;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(30, 27, 75, 0.4);
-  }
+/* ── Modal heading — readable dark purple on white card ── */
+.modal-heading {
+  color: #1E1B4B !important;
+  font-size: 1.5rem;
+  font-weight: 900;
+}
 
-  /* ── Modal heading — readable dark purple on white card ── */
-  .modal-heading {
-    color: #1E1B4B !important;
-    font-size: 1.5rem;
-    font-weight: 900;
-  }
+/* ── Light pods on dark background: force dark text ── */
+.glass-card-content {
+  color: #1E1B4B !important;
+}
 
-  /* ── Light pods on dark background: force dark text ── */
-  .glass-card-content {
-    color: #1E1B4B !important;
-  }
+/* ── Deep-purple gradient primary button (e.g. Upload) ── */
+.btn-primary-purple {
+  background: linear-gradient(135deg, #4C1D95 0%, #1E1B4B 100%);
+  color: white;
+  font-weight: 800;
+  padding: 1rem 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 15px -3px rgba(76, 29, 149, 0.4);
+  transition: all 0.3s ease;
+}
 
-  /* ── Deep-purple gradient primary button (e.g. Upload) ── */
-  .btn-primary-purple {
-    background: linear-gradient(135deg, #4C1D95 0%, #1E1B4B 100%);
-    color: white;
-    font-weight: 800;
-    padding: 1rem 2rem;
-    border-radius: 1rem;
-    box-shadow: 0 10px 15px -3px rgba(76, 29, 149, 0.4);
-    transition: all 0.3s ease;
-  }
-
-  .btn-primary-purple:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.1);
-  }
+.btn-primary-purple:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
 }

@@ -12,10 +12,10 @@ export function TaskApproval() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                <h1 className="text-4xl font-black text-foreground tracking-tight">
                     Task <span className="text-gradient-indigo">Approval</span>
                 </h1>
-                <p className="text-slate-500 mt-1">Review and approve tasks assigned to faculty members.</p>
+                <p className="text-muted-foreground mt-1">Review and approve tasks assigned to faculty members.</p>
             </div>
 
             <div className="grid gap-4">
@@ -24,7 +24,7 @@ export function TaskApproval() {
                         <div className="w-16 h-16 rounded-3xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
                             <CheckCircle className="h-8 w-8 text-indigo-300" />
                         </div>
-                        <p className="text-slate-500 font-semibold">No pending approvals — all clear! 🎉</p>
+                        <p className="text-muted-foreground font-semibold">No pending approvals — all clear! 🎉</p>
                     </div>
                 ) : (
                     approvalTasks.map((task) => (
@@ -34,7 +34,7 @@ export function TaskApproval() {
                         >
                             <div className="space-y-1.5">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="font-bold text-slate-800 text-base">{task.title}</h3>
+                                    <h3 className="font-bold text-foreground text-base">{task.title}</h3>
                                     <span className={cn(
                                         "rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
                                         task.priority === "High" ? "bg-red-100 text-red-700"
@@ -44,7 +44,7 @@ export function TaskApproval() {
                                         {task.priority}
                                     </span>
                                 </div>
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-muted-foreground">
                                     Assigned to: <span className="font-semibold text-slate-700">{task.assignee}</span> · Due: {task.dueDate}
                                 </p>
                             </div>
@@ -52,7 +52,7 @@ export function TaskApproval() {
                             <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
                                 <button
                                     onClick={() => navigate(`/tasks/${task.id}`)}
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-500 bg-white/60 hover:bg-white/90 rounded-2xl transition-all border border-white/50"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-muted-foreground bg-white/60 hover:bg-white/90 rounded-2xl transition-all border border-white/50"
                                 >
                                     <Info className="h-4 w-4" /> Details
                                 </button>

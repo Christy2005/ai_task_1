@@ -77,10 +77,10 @@ export function LoginPage() {
                         </div>
                         <span className="text-3xl font-black text-gradient-indigo">SmartTask</span>
                     </div>
-                    <h2 className="text-2xl font-black text-slate-800">
+                    <h2 className="text-2xl font-black text-foreground">
                         {isRegister ? "Create your account" : "Welcome back"}
                     </h2>
-                    <p className="text-slate-500 text-sm mt-1">
+                    <p className="text-muted-foreground text-sm mt-1">
                         {isRegister
                             ? "Join the Smart Task Dashboard"
                             : "Sign in to continue to your dashboard"}
@@ -94,15 +94,15 @@ export function LoginPage() {
                         {/* Name (register only) */}
                         {isRegister && (
                             <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Full Name</label>
-                                <div className="flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all">
-                                    <User className="h-4 w-4 text-slate-400 shrink-0" />
+                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+                                <div className="flex items-center gap-3 bg-glass border border-glass-border rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-accent-indigo transition-all">
+                                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
                                     <input
                                         type="text"
                                         placeholder="John Doe"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
+                                        className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none font-medium"
                                     />
                                 </div>
                             </div>

@@ -51,10 +51,10 @@ export function Notifications() {
         <div className="max-w-3xl mx-auto space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                    <h1 className="text-4xl font-black text-foreground tracking-tight">
                         <span className="text-gradient-indigo">Notifications</span>
                     </h1>
-                    <p className="text-slate-500 mt-1">Stay updated on tasks and meetings.</p>
+                    <p className="text-muted-foreground mt-1">Stay updated on tasks and meetings.</p>
                 </div>
                 <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors px-4 py-2 rounded-2xl hover:bg-white/60">
                     Mark all as read
@@ -85,13 +85,13 @@ export function Notifications() {
                                 <div className="flex items-center justify-between gap-3 mb-1">
                                     <p className={cn(
                                         "font-bold text-sm",
-                                        !notification.read ? "text-slate-800" : "text-slate-600"
+                                        !notification.read ? "text-foreground" : "text-slate-600"
                                     )}>
                                         {notification.title}
                                     </p>
                                     <span className="text-xs text-slate-400 shrink-0">{notification.time}</span>
                                 </div>
-                                <p className="text-sm text-slate-500">{notification.message}</p>
+                                <p className="text-sm text-muted-foreground">{notification.message}</p>
                             </div>
 
                             {!notification.read && (

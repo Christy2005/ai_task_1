@@ -96,7 +96,7 @@ function AdminView() {
                 <h1 className="text-4xl font-black tracking-tight">
                     Faculty <span className="text-gradient-indigo">Management</span>
                 </h1>
-                <p className="text-slate-500 mt-1">Assign tasks to faculty members from your Neon database.</p>
+                <p className="text-muted-foreground mt-1">Assign tasks to faculty members from your Neon database.</p>
             </div>
 
             {/* Toast */}

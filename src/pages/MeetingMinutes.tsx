@@ -31,10 +31,10 @@ export function MeetingMinutes() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+                <h1 className="text-4xl font-black text-foreground tracking-tight">
                     Meeting <span className="text-gradient-indigo">Minutes</span>
                 </h1>
-                <p className="text-slate-500 mt-1">Access and manage generated minutes and transcripts.</p>
+                <p className="text-muted-foreground mt-1">Access and manage generated minutes and transcripts.</p>
             </div>
 
             <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
@@ -52,14 +52,14 @@ export function MeetingMinutes() {
                         <tbody className="divide-y divide-white/30">
                             {minutes.map((item) => (
                                 <tr key={item.id} className="hover:bg-white/40 transition-colors">
-                                    <td className="px-7 py-4 font-semibold text-slate-800 flex items-center gap-3">
+                                    <td className="px-7 py-4 font-semibold text-foreground flex items-center gap-3">
                                         <div className="p-2 rounded-xl bg-indigo-100 text-indigo-600">
                                             <FileText className="h-4 w-4" />
                                         </div>
                                         {item.title}
                                     </td>
-                                    <td className="px-7 py-4 text-slate-500">{item.date}</td>
-                                    <td className="px-7 py-4 text-slate-500">{item.duration}</td>
+                                    <td className="px-7 py-4 text-muted-foreground">{item.date}</td>
+                                    <td className="px-7 py-4 text-muted-foreground">{item.duration}</td>
                                     <td className="px-7 py-4">
                                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${item.status === "Processed" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                                             {item.status}

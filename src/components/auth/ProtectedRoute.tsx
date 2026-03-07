@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 
 interface ProtectedRouteProps {
   children?: ReactNode;

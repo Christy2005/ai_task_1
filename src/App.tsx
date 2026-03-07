@@ -12,6 +12,7 @@ import { TaskDetails } from "./pages/TaskDetails";
 import { LoginPage } from "./pages/LoginPage";
 import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
 const router = createBrowserRouter([
@@ -71,9 +72,11 @@ const router = createBrowserRouter([
 
 function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

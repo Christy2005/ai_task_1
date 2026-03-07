@@ -26,9 +26,9 @@ const ExtractedTaskList = ({ tasks }: ExtractedTaskListProps) => {
 
     return (
         <div className="mt-8 space-y-4">
-            <h3 className="text-2xl font-black text-white mb-6 px-1">
+            <h3 className="text-2xl font-black mb-6 px-1">
                 Extracted Tasks{" "}
-                <span className="text-indigo-400">({tasks.length})</span>
+                <span className="text-accent-indigo">({tasks.length})</span>
             </h3>
 
             {tasks.map((task, index) => {
@@ -55,11 +55,11 @@ const ExtractedTaskList = ({ tasks }: ExtractedTaskListProps) => {
                         <div className="flex justify-between items-start gap-4">
                             <div className="space-y-2 flex-1 min-w-0">
                                 {/* Task title — high-contrast midnight purple */}
-                                <h4 className="text-[#1E1B4B] text-lg font-extrabold tracking-tight group-hover:text-black transition-colors truncate">
+                                <h4 className="text-lg font-extrabold tracking-tight group-hover:text-accent-indigo transition-colors truncate">
                                     {task.title}
                                 </h4>
 
-                                <div className="flex items-center gap-4 text-slate-600 font-bold text-sm flex-wrap">
+                                <div className="flex items-center gap-4 text-muted-foreground font-bold text-sm flex-wrap">
                                     <span className="flex items-center gap-1.5">
                                         <User size={13} className="text-indigo-500 shrink-0" />
                                         {assignee}

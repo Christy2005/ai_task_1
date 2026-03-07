@@ -34,7 +34,7 @@ export function AssignTaskModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-card glass-border border rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden">
 
                 {/* ── Coloured top accent bar ── */}
                 <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
@@ -43,19 +43,19 @@ export function AssignTaskModal({
                     {/* Header */}
                     <div className="flex items-start justify-between">
                         <div>
-                            <h2 className="text-2xl font-black text-[#1E1B4B]">
+                            <h2 className="text-2xl font-black text-foreground">
                                 Assign Extra Task
                             </h2>
-                            <p className="text-slate-500 text-sm mt-1">
+                            <p className="text-muted-foreground text-sm mt-1">
                                 Assigning to:{" "}
-                                <span className="font-bold text-indigo-600">
+                                <span className="font-bold text-accent-indigo">
                                     {modal.facultyName}
                                 </span>
                             </p>
                         </div>
                         <button
                             onClick={onClose}
-                            className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-[#1E1B4B] transition-colors"
+                            className="p-2 rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                         >
                             <X className="h-5 w-5" />
                         </button>
@@ -65,7 +65,7 @@ export function AssignTaskModal({
                     <div className="space-y-4">
                         {/* Title */}
                         <div>
-                            <label className="block text-[11px] font-black uppercase tracking-widest text-[#1E1B4B] mb-1.5">
+                            <label className="block text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-1.5">
                                 Task Title *
                             </label>
                             <input
@@ -74,13 +74,13 @@ export function AssignTaskModal({
                                 placeholder="e.g. Prepare Lab Manual"
                                 value={modal.title}
                                 onChange={(e) => field("title", e.target.value)}
-                                className="w-full bg-slate-100 border-none rounded-2xl px-4 py-3 text-[#1E1B4B] text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all"
+                                className="w-full bg-secondary border-none rounded-2xl px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-accent-indigo transition-all"
                             />
                         </div>
 
                         {/* Description */}
                         <div>
-                            <label className="block text-[11px] font-black uppercase tracking-widest text-[#1E1B4B] mb-1.5">
+                            <label className="block text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-1.5">
                                 Description
                             </label>
                             <textarea
@@ -88,14 +88,14 @@ export function AssignTaskModal({
                                 placeholder="Optional task details…"
                                 value={modal.description}
                                 onChange={(e) => field("description", e.target.value)}
-                                className="w-full bg-slate-100 border-none rounded-2xl px-4 py-3 text-[#1E1B4B] text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all resize-none"
+                                className="w-full bg-secondary border-none rounded-2xl px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-accent-indigo transition-all resize-none"
                             />
                         </div>
 
                         {/* Priority + Due Date */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[11px] font-black uppercase tracking-widest text-[#1E1B4B] mb-1.5">
+                                <label className="block text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-1.5">
                                     Priority
                                 </label>
                                 <select
