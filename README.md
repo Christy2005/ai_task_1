@@ -1,73 +1,100 @@
-# React + TypeScript + Vite
+# 🚀 AI Meeting Task Extractor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 🧠 Overview
+AI Meeting Task Extractor is a full-stack web application that converts meeting audio into structured, actionable tasks.
 
-Currently, two official plugins are available:
+It automates note-taking by transcribing speech and extracting tasks using AI, helping users save time and improve productivity.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🎯 Key Features
+- 🎤 Upload meeting audio
+- 📝 Speech-to-text transcription (Deepgram)
+- 🤖 AI-based task extraction (Gemini)
+- 📊 Dashboard to view tasks
+- 🔐 User authentication (JWT)
+- 🗄️ PostgreSQL database integration (Neon)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🏗️ Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Frontend
+- React + TypeScript (Vite)
+- TailwindCSS
+- Context API
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Backend
+- Node.js + Express
+- REST API architecture
+- JWT Authentication
+- Multer (file upload)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### AI Services
+- Deepgram (Speech-to-text)
+- Gemini AI (Task extraction)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Database
+- Neon PostgreSQL
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🔄 Workflow
+Audio → Transcript → AI → JSON Tasks → Database → Dashboard
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+
+---
+
+## ✅ Implemented Features
+- Authentication system (JWT + bcrypt)
+- Audio upload and processing
+- AI pipeline integration
+- Task extraction and storage
+- Frontend dashboard with task display
+- Error handling and debugging fixes
+
+---
+
+## ⚠️ Limitations
+- No role-based access system
+- Tasks not linked to users
+- No update/delete APIs
+- No filtering in dashboard
+- Basic security (JWT in localStorage)
+
+---
+
+## 🔜 Future Improvements
+- Role-based access (Admin / Faculty)
+- Task ownership mapping
+- Update & delete APIs
+- Dashboard filtering
+- Rate limiting & logging
+- Production deployment
+
+---
+
+## 📊 Project Status
+| Area | Status |
+|------|--------|
+| Backend | ✅ 90% |
+| AI Integration | ✅ 95% |
+| Database | ✅ 90% |
+| Frontend | ✅ 85% |
+| Production Ready | 🟡 70% |
+
+---
+
+## 💡 Summary
+This project demonstrates:
+- Full-stack development
+- AI integration in real-world apps
+- Backend architecture
+- Database design
+- Debugging and problem-solving skills
+
+---
+
+## 👩‍💻 Author
+**Bineta Saju**
+# TEST CHANGE BY BINETA
