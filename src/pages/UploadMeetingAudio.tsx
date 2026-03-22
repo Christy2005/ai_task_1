@@ -6,6 +6,27 @@ import ExtractedTaskList from "@/components/ai/ExtractedTaskList";
 import { Toast } from "@/components/ui/Toast";
 import { generateMeetingPDF } from "@/utils/exportPdf";
 
+interface RawTask {
+  title?: string;
+  assignee?: string;
+  assigned_to?: string;
+  dueDate?: string;
+  due_date?: string;
+  priority?: string;
+}
+
+interface ExtractedTask {
+  title: string;
+  assignee: string;
+  dueDate: string;
+  priority: TaskPriority;
+}
+
+interface ApiResponse {
+  transcript?: string;
+  tasks?: RawTask[];
+}
+
 function toTaskPriority(val: string): TaskPriority {
   if (val === "High" || val === "Low") return val;
   return "Medium";
@@ -15,12 +36,18 @@ export function UploadMeetingAudio() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
-  const [extractedTasks, setExtractedTasks] = useState<any[]>([]);
+  const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
   const [showToast, setShowToast] = useState(false);
+
+  // ✅ NEW STATES
+  const [title, setTitle] = useState("");
+  const [host, setHost] = useState("");
+  const [meetingDate, setMeetingDate] = useState("");
+
   const { addTask } = useTasks();
   const { role } = useAuth();
-  // PDF title — can be extended to a user-editable field later
-  const meetingTitle = "General Discussion";
+
+  const meetingTitle = title || "General Discussion";
 
   const triggerToast = () => {
     setShowToast(true);
@@ -30,13 +57,23 @@ export function UploadMeetingAudio() {
   const handleProcess = async () => {
     if (!file) return alert("Please select a file.");
 
+    // ✅ VALIDATION
+    if (!title || !host || !meetingDate) {
+      alert("Please fill all meeting details");
+      return;
+    }
+
     setLoading(true);
+
     const formData = new FormData();
     formData.append("audio", file);
+    formData.append("title", title);
+    formData.append("host", host);
+    formData.append("meeting_date", meetingDate);
 
     try {
-      console.log("📤 Sending audio to backend...");
       const token = localStorage.getItem("token");
+
       const res = await fetch("http://localhost:3000/api/ai/analyze-voice", {
         method: "POST",
         headers: {
@@ -45,44 +82,26 @@ export function UploadMeetingAudio() {
         body: formData,
       });
 
-      console.log("📥 Response status:", res.status);
-
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("❌ HTTP Error Response:", errorText);
-        alert(`Backend error (${res.status}). Check console for details.`);
+        console.error(errorText);
+        alert("Backend error");
         return;
       }
 
-      let data: any = {};
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        console.error("❌ Failed to parse JSON response:", parseErr);
-        alert("Backend returned an unreadable response.");
-        return;
-      }
+      const data: ApiResponse = await res.json();
 
-      console.log("✅ Raw response data:", data);
-
-      const rawTranscript: string = typeof data.transcript === "string" ? data.transcript : "";
-      const rawTasks: any[] = Array.isArray(data.tasks) ? data.tasks : [];
-
-      console.log(`📋 Transcript length: ${rawTranscript.length} chars`);
-      console.log(`🗂️ Tasks received: ${rawTasks.length}`);
+      const rawTranscript = data.transcript || "";
+      const rawTasks = data.tasks || [];
 
       setTranscript(rawTranscript || null);
 
-      const normalizedTasks = rawTasks.map((task: any, idx: number) => {
-        const title: string = task?.title || "Untitled Task";
-        const assignee: string = task?.assignee || task?.assigned_to || "Unknown";
-        const dueDate: string = task?.dueDate || task?.due_date || "";
-        const priority: TaskPriority = toTaskPriority(task?.priority || "Medium");
-
-        console.log(`  Task[${idx}]:`, { title, assignee, dueDate, priority });
-
-        return { title, assignee, dueDate, priority };
-      });
+      const normalizedTasks = rawTasks.map((task) => ({
+        title: task.title || "Untitled Task",
+        assignee: task.assignee || task.assigned_to || "Unknown",
+        dueDate: task.dueDate || task.due_date || "",
+        priority: toTaskPriority(task.priority || "Medium"),
+      }));
 
       setExtractedTasks(normalizedTasks);
 
@@ -94,20 +113,23 @@ export function UploadMeetingAudio() {
           priority: task.priority,
           status: "Pending",
           category: "Approval",
-          description: rawTranscript ? `Extracted from: "${rawTranscript}"` : "Extracted from audio",
+          description: rawTranscript || "Extracted from audio",
         });
       });
 
-      if (normalizedTasks.length === 0) {
-        alert("Processing complete. No tasks were extracted from this audio.");
-      } else {
-        triggerToast(); // ✅ show glass toast — JWT accepted, Neon synced
+      if (normalizedTasks.length > 0) {
+        triggerToast();
       }
 
+      // ✅ RESET FORM
       setFile(null);
-    } catch (err: any) {
-      console.error("❌ Frontend Error:", err);
-      alert(`Unexpected error: ${err?.message || "Check the browser console for details."}`);
+      setTitle("");
+      setHost("");
+      setMeetingDate("");
+    } catch (err: Error | unknown) {
+      console.error(err);
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -115,72 +137,86 @@ export function UploadMeetingAudio() {
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-4xl font-black text-slate-800 tracking-tight">
-          Upload <span className="text-gradient-indigo">Audio</span>
-        </h1>
-        <p className="text-slate-500 mt-1">Transcribe meeting recordings and extract tasks with AI.</p>
+      <h1 className="text-4xl font-black">
+        Upload <span className="text-indigo-500">Audio</span>
+      </h1>
+
+      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+        
+        {/* ✅ INPUT FIELDS */}
+        <input
+          type="text"
+          placeholder="Meeting Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full p-3 border rounded-lg"
+        />
+
+        <input
+          type="text"
+          placeholder="Host Name"
+          value={host}
+          onChange={(e) => setHost(e.target.value)}
+          className="w-full p-3 border rounded-lg"
+        />
+
+        <input
+          type="date"
+          value={meetingDate}
+          onChange={(e) => setMeetingDate(e.target.value)}
+          className="w-full p-3 border rounded-lg"
+        />
+
+        {/* FILE UPLOAD */}
+        <input
+          type="file"
+          accept="audio/*,video/mp4"
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              console.log("Selected file:", e.target.files[0]);
+              setFile(e.target.files[0]);
+            } else {
+              alert("File not selected properly");
+            }
+          }}
+          className="w-full p-3 border rounded-lg"
+        />
+
+
+        <button
+          onClick={handleProcess}
+          disabled={loading}
+          className="bg-indigo-500 text-white px-6 py-2 rounded"
+        >
+          {loading ? "Processing..." : "Extract Tasks"}
+        </button>
       </div>
 
-      {/* Upload Card */}
-      <div className="glass-card glass-shadow rounded-[2rem] p-8 space-y-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-200/50">
-            <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-          </div>
-          <h2 className="text-xl font-bold text-slate-800">AI Meeting Transcriber</h2>
-        </div>
-
-        {/* Drop Zone */}
-        <label className="flex flex-col items-center justify-center w-full h-40 rounded-3xl border-2 border-dashed border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 transition-colors cursor-pointer group">
-          <svg className="h-10 w-10 text-indigo-300 group-hover:text-indigo-400 mb-3 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-          <span className="text-sm font-semibold text-indigo-600">{file ? `📎 ${file.name}` : "Click to select audio file"}</span>
-          <span className="text-xs text-slate-400 mt-1">MP3, WAV, MP4 supported</span>
-          <input type="file" accept="audio/*,video/mp4" className="hidden" onChange={(e) => e.target.files && setFile(e.target.files[0])} />
-        </label>
-
-        {file && (
-          <button
-            onClick={handleProcess}
-            disabled={loading}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-base shadow-lg shadow-indigo-200/60 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            {loading ? "🤖 AI is analysing…" : "✨ Extract Tasks"}
-          </button>
-        )}
-      </div>
-
-      {/* Transcript Result */}
+      {/* TRANSCRIPT */}
       {transcript && (
-        <div className="glass-card glass-shadow rounded-[2rem] p-8 border-l-4 border-indigo-400">
-          <h3 className="text-lg font-bold mb-4 text-indigo-800">📝 Transcript</h3>
-          <p className="transcript-box transcript-text text-slate-700 bg-white/60 p-5 rounded-2xl leading-relaxed">
-            {transcript}
-          </p>
+        <div className="bg-gray-100 p-4 rounded">
+          <h3 className="font-bold">Transcript</h3>
+          <p>{transcript}</p>
         </div>
       )}
 
-      {/* Extracted Tasks */}
+      {/* TASKS */}
       <ExtractedTaskList tasks={extractedTasks} />
 
-      {/* PDF Export — admin only, shown after tasks are extracted */}
+      {/* PDF */}
       {extractedTasks.length > 0 && role === "admin" && (
-        <div className="flex justify-end mt-2">
-          <button
-            onClick={() => generateMeetingPDF(meetingTitle || "General Discussion", extractedTasks)}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white font-black hover:bg-white/20 transition-all shadow-lg"
-          >
-            <Download size={17} className="text-indigo-400" />
-            Download Minutes (PDF)
-          </button>
-        </div>
+        <button
+          onClick={() =>
+            generateMeetingPDF(meetingTitle, extractedTasks)
+          }
+        >
+          <Download size={16} /> Download PDF
+        </button>
       )}
 
-      {/* Glass Toast — appears on successful AI extraction */}
       {showToast && (
         <Toast
-          message={`AI Analysis Complete! ${extractedTasks.length} task${extractedTasks.length === 1 ? "" : "s"} assigned to Faculty.`}
+          message={`Saved ${extractedTasks.length} tasks`}
           onClose={() => setShowToast(false)}
         />
       )}

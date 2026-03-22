@@ -1,83 +1,166 @@
-import { FileText, Download, Eye, MoreHorizontal } from "lucide-react";
+import { useEffect, useState } from "react";
 
-const minutes = [
-    {
-        id: 1,
-        title: "Faculty Board Meeting",
-        date: "Jan 28, 2026",
-        duration: "45 min",
-        attendees: 12,
-        status: "Processed",
-    },
-    {
-        id: 2,
-        title: "Curriculum Review",
-        date: "Jan 25, 2026",
-        duration: "1h 20m",
-        attendees: 8,
-        status: "Processed",
-    },
-    {
-        id: 3,
-        title: "Research Grant Discussion",
-        date: "Jan 22, 2026",
-        duration: "30 min",
-        attendees: 4,
-        status: "Processing",
-    },
-];
+interface Meeting {
+  id: string;
+  title: string;
+  meeting_date: string;
+  host: string;
+  summary: string;
+}
 
 export function MeetingMinutes() {
-    return (
-        <div className="space-y-8">
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  // For delete modal
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const token = localStorage.getItem("token");
+
+  /* =============================
+     FETCH MEETINGS
+  ============================= */
+  const fetchMeetings = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/api/meetings", {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        setMeetings(data);
+      } else {
+        setMeetings([]);
+      }
+    } catch (error) {
+      console.error("❌ Error fetching meetings:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMeetings();
+  }, []);
+
+  /* =============================
+     DELETE MEETING
+  ============================= */
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    try {
+      const res = await fetch(
+        `http://localhost:3000/api/meetings/${deleteId}`,
+        {
+          method: "DELETE",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Delete failed:", errorText);
+        return;
+      }
+
+      // Close modal
+      setDeleteId(null);
+
+      // Refresh list
+      fetchMeetings();
+    } catch (err) {
+      console.error("❌ Error deleting meeting:", err);
+    }
+  };
+
+  /* =============================
+     UI
+  ============================= */
+  return (
+    <div className="space-y-6 p-6">
+      <h1 className="text-3xl font-bold">
+        Meeting <span className="text-indigo-500">Minutes</span>
+      </h1>
+
+      {meetings.length === 0 && (
+        <p className="text-gray-500">No meetings found</p>
+      )}
+
+      {meetings.map((m) => (
+        <div key={m.id} className="bg-white p-4 rounded shadow">
+          <div className="flex justify-between items-center">
             <div>
-                <h1 className="text-4xl font-black text-foreground tracking-tight">
-                    Meeting <span className="text-gradient-indigo">Minutes</span>
-                </h1>
-                <p className="text-muted-foreground mt-1">Access and manage generated minutes and transcripts.</p>
+              <h2 className="font-bold">{m.title}</h2>
+              <p className="text-sm text-gray-500">
+                {m.meeting_date} • {m.host}
+              </p>
             </div>
 
-            <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-white/40">
-                            <tr>
-                                <th className="px-7 py-4">Meeting Title</th>
-                                <th className="px-7 py-4">Date</th>
-                                <th className="px-7 py-4">Duration</th>
-                                <th className="px-7 py-4">Status</th>
-                                <th className="px-7 py-4 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/30">
-                            {minutes.map((item) => (
-                                <tr key={item.id} className="hover:bg-white/40 transition-colors">
-                                    <td className="px-7 py-4 font-semibold text-foreground flex items-center gap-3">
-                                        <div className="p-2 rounded-xl bg-indigo-100 text-indigo-600">
-                                            <FileText className="h-4 w-4" />
-                                        </div>
-                                        {item.title}
-                                    </td>
-                                    <td className="px-7 py-4 text-muted-foreground">{item.date}</td>
-                                    <td className="px-7 py-4 text-muted-foreground">{item.duration}</td>
-                                    <td className="px-7 py-4">
-                                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${item.status === "Processed" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                            {item.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-7 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white/60 rounded-xl transition-all" title="View"><Eye className="h-4 w-4" /></button>
-                                            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white/60 rounded-xl transition-all" title="Download"><Download className="h-4 w-4" /></button>
-                                            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white/60 rounded-xl transition-all"><MoreHorizontal className="h-4 w-4" /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+            <div className="flex gap-3 items-center">
+              <button
+                onClick={() =>
+                  setOpenId(openId === m.id ? null : m.id)
+                }
+                className="text-indigo-500"
+              >
+                {openId === m.id ? "Hide" : "View"}
+              </button>
+
+              <button
+                onClick={() => setDeleteId(m.id)}
+                className="text-red-500"
+              >
+                Delete
+              </button>
             </div>
+          </div>
+
+          {openId === m.id && (
+            <div className="mt-3">
+              <p className="text-gray-700 whitespace-pre-line">
+                {m.summary}
+              </p>
+            </div>
+          )}
         </div>
-    );
+      ))}
+
+      {/* =============================
+          DELETE CONFIRMATION MODAL
+      ============================= */}
+      {deleteId && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white p-6 rounded shadow w-80">
+            <h2 className="text-lg font-bold mb-4">
+              Confirm Delete
+            </h2>
+
+            <p className="mb-6 text-gray-600">
+              Are you sure you want to delete this meeting minutes?
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteId(null)}
+                className="px-4 py-2 bg-gray-300 rounded"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
