@@ -33,7 +33,7 @@ const navItems = [
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-    const { user, logout } = useAuth();
+    const { user, role, logout } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -90,7 +90,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
                 {/* Nav */}
                 <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-                    {navItems.map((item) => (
+                    {navItems
+                        .filter(item => {
+                            if (role !== "admin") {
+                                return !["/upload-audio", "/meeting-minutes", "/task-approval"].includes(item.href);
+                            }
+                            return true;
+                        })
+                        .map((item) => (
                         <NavLink
                             key={item.href}
                             to={item.href}
@@ -127,7 +134,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </div>
                         <div className="overflow-hidden min-w-0">
                             <p className="text-sm font-bold text-foreground truncate">{user ?? "admin@gmail.com"}</p>
-                            <p className="text-[10px] uppercase tracking-widest text-accent-indigo font-black">Admin</p>
+                            <p className="text-[10px] uppercase tracking-widest text-accent-indigo font-black">{role || "Faculty"}</p>
                         </div>
                     </div>
                 </div>

@@ -8,6 +8,7 @@ export function LoginPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [roleInput, setRoleInput] = useState("faculty");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -31,7 +32,7 @@ export function LoginPage() {
                 : "http://localhost:3000/api/auth/login";
 
             const bodyData = isRegister
-                ? { name, email, password }
+                ? { name, email, password, role: roleInput }
                 : { email, password };
 
             const response = await fetch(endpoint, {
@@ -104,6 +105,24 @@ export function LoginPage() {
                                         onChange={(e) => setName(e.target.value)}
                                         className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none font-medium"
                                     />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Role (register only) */}
+                        {isRegister && (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Select Role</label>
+                                <div className="flex items-center gap-3 bg-glass border border-glass-border rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-accent-indigo transition-all">
+                                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <select
+                                        value={roleInput}
+                                        onChange={(e) => setRoleInput(e.target.value)}
+                                        className="flex-1 bg-transparent text-sm text-foreground focus:outline-none font-medium appearance-none"
+                                    >
+                                        <option value="faculty" className="text-slate-800">Faculty</option>
+                                        <option value="admin" className="text-slate-800">Admin</option>
+                                    </select>
                                 </div>
                             </div>
                         )}

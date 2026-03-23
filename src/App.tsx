@@ -14,6 +14,7 @@ import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { AdminOnlyRoute } from "./components/auth/AdminOnlyRoute";
 
 const router = createBrowserRouter([
   {
@@ -36,15 +37,27 @@ const router = createBrowserRouter([
       },
       {
         path: "upload-audio",
-        element: <UploadMeetingAudio />,
+        element: (
+          <AdminOnlyRoute>
+            <UploadMeetingAudio />
+          </AdminOnlyRoute>
+        ),
       },
       {
         path: "meeting-minutes",
-        element: <MeetingMinutes />,
+        element: (
+          <AdminOnlyRoute>
+            <MeetingMinutes />
+          </AdminOnlyRoute>
+        ),
       },
       {
         path: "task-approval",
-        element: <TaskApproval />,
+        element: (
+          <AdminOnlyRoute>
+            <TaskApproval />
+          </AdminOnlyRoute>
+        ),
       },
       {
         path: "faculty-tasks",

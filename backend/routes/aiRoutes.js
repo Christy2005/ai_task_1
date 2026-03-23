@@ -7,7 +7,7 @@ import {
   generateMeetingSummary,
 } from "../services/aiService.js";
 import pool from "../database.js";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken, requireRole } from "../middleware/authMiddleware.js";
 import { createLogger } from "../utils/logger.js";
 
 const router = express.Router();
@@ -53,6 +53,7 @@ async function resolveFacultyId(nameOrEmail) {
 router.post(
   "/analyze-voice",
   verifyToken,
+  requireRole("admin"),
   aiLimiter,
   upload.single("audio"),
   async (req, res, next) => {
@@ -135,8 +136,8 @@ router.post(
 
         const sql = `
           INSERT INTO tasks 
-          (title, description, status, priority, due_date, assigned_to, user_id, created_by, meeting_id)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          (title, description, status, priority, due_date, user_id, created_by, meeting_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING *
         `;
 
@@ -146,7 +147,6 @@ router.post(
           "pending",
           priority,
           due_date,
-          assigneeRaw,
           resolvedUserId,
           req.user.id,
           meetingId,
