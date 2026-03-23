@@ -12,12 +12,12 @@ export interface Task {
     priority: TaskPriority;
     status: TaskStatus;
     category: "Approval" | "Faculty";
-    description?: string;
 }
 
 interface TaskContextType {
     tasks: Task[];
     updateTaskStatus: (id: string, newStatus: TaskStatus) => void;
+    updateTask: (id: string, updated: Partial<Omit<Task, "id">>) => void;
     addTask: (task: Omit<Task, "id">) => void;
     getTask: (id: string) => Task | undefined;
 }
@@ -43,10 +43,18 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         );
     };
 
+    const updateTask = (id: string, updated: Partial<Omit<Task, "id">>) => {
+        setTasks(prev =>
+            prev.map(task =>
+                task.id === id ? { ...task, ...updated } : task
+            )
+        );
+    };
+
     const getTask = (id: string) => tasks.find(t => t.id === id);
 
     return (
-        <TaskContext.Provider value={{ tasks, updateTaskStatus, addTask, getTask }}>
+        <TaskContext.Provider value={{ tasks, updateTaskStatus, updateTask, addTask, getTask }}>
             {children}
         </TaskContext.Provider>
     );

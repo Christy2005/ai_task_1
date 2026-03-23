@@ -68,3 +68,17 @@ CREATE INDEX IF NOT EXISTS idx_users_role        ON users(role);
 --   created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
 --   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 -- );
+
+CREATE TABLE IF NOT EXISTS meetings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  host TEXT,
+  meeting_date TIMESTAMP,
+  summary TEXT,
+  transcript TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE tasks
+ADD COLUMN IF NOT EXISTS meeting_id UUID REFERENCES meetings(id) ON DELETE CASCADE;
