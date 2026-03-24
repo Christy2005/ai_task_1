@@ -78,6 +78,10 @@ STRICT RULES:
 - No transcript copying
 - No long explanations
 - Keep output concise
+- dueDate MUST be in YYYY-MM-DD format only
+- If year is not mentioned, assume current year (${new Date().getFullYear()})
+- If date is unclear, return null
+
 
 Return ONLY JSON array.
 
