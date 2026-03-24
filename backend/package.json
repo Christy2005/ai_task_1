@@ -5,8 +5,8 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "fuser -k 3000/tcp 2>/dev/null; NODE_NO_WARNINGS=1 node server.js",
-    "dev": "fuser -k 3000/tcp 2>/dev/null; NODE_NO_WARNINGS=1 node --watch server.js"
+    "start": "node --no-warnings server.js",
+    "dev": "node --no-warnings --watch server.js"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
@@ -22,6 +22,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
+    "openai": "^6.32.0",
     "pg": "^8.19.0"
   }
 }

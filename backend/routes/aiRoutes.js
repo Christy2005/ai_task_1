@@ -73,7 +73,7 @@ router.post(
       const transcript = await speechToText(req.file.buffer, req.file.mimetype);
       logger.info("Transcript received, length:", transcript.length);
 
-      // ── 2. Extract task details (handles caching, fallback, and JSON parsing) ─
+      // ── 2. Extract task details
       const extractedTasks = await extractTaskDetails(transcript);
 
       logger.debug("Extracted tasks:", JSON.stringify(extractedTasks, null, 2));
