@@ -21,7 +21,7 @@ interface SidebarProps {
     onClose: () => void;
 }
 
-const navItems = [
+const adminNavItems = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Upload Audio", href: "/upload-audio", icon: Upload },
     { name: "Meeting Minutes", href: "/meeting-minutes", icon: FileText },
@@ -32,9 +32,18 @@ const navItems = [
     { name: "Profile", href: "/profile", icon: User },
 ];
 
+const facultyNavItems = [
+    { name: "Faculty Tasks", href: "/faculty-tasks", icon: ClipboardList },
+    { name: "Meeting Minutes", href: "/meeting-minutes", icon: FileText },
+    { name: "Notifications", href: "/notifications", icon: Bell },
+    { name: "Calendar", href: "/calendar", icon: Calendar },
+    { name: "Profile", href: "/profile", icon: User },
+];
+
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-    const { user, logout } = useAuth();
+    const { user, role, logout } = useAuth();
     const navigate = useNavigate();
+    const navItems = role === "admin" ? adminNavItems : facultyNavItems;
 
     const handleLogout = () => {
         logout();
@@ -127,7 +136,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </div>
                         <div className="overflow-hidden min-w-0">
                             <p className="text-sm font-bold text-foreground truncate">{user ?? "admin@gmail.com"}</p>
-                            <p className="text-[10px] uppercase tracking-widest text-accent-indigo font-black">Admin</p>
+                            <p className="text-[10px] uppercase tracking-widest text-accent-indigo font-black">{role ?? "Faculty"}</p>
                         </div>
                     </div>
                 </div>

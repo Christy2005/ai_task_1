@@ -73,80 +73,32 @@ router.post(
       const transcript = await speechToText(req.file.buffer, req.file.mimetype);
       logger.info("Transcript received, length:", transcript.length);
 
-      // ── 2. Extract task details ───────────────────────────────────────────────
-      const extractedRaw = await extractTaskDetails(transcript);
-      logger.debug("Raw AI output:", extractedRaw);
-
-      // ── 3. Safe JSON parse (handles ```json … ``` markdown fences) ────────────
-      let extractedTasks;
-      try {
-        const cleaned = extractedRaw
-          .replace(/^```json\s*/i, "")
-          .replace(/^```\s*/i, "")
-          .replace(/```\s*$/i, "")
-          .trim();
-
-        const parsed = JSON.parse(cleaned);
-        extractedTasks = Array.isArray(parsed) ? parsed : [parsed];
-      } catch (parseErr) {
-        logger.warn("JSON parse failed, using fallback task:", parseErr.message);
-        extractedTasks = [
-          {
-            title: "New Task",
-            description: transcript,
-            status: "pending",
-            assigned_to: null,
-            due_date: null,
-            priority: "Medium",
-          },
-        ];
-      }
+      // ── 2. Extract task details (handles caching, fallback, and JSON parsing) ─
+      const extractedTasks = await extractTaskDetails(transcript);
 
       logger.debug("Extracted tasks:", JSON.stringify(extractedTasks, null, 2));
 
-      // ── 4. Insert each task with ownership ───────────────────────────────────
+      // ── 4. Insert each task tied to logged-in user ─────────────────────────
       const savedTasks = [];
-      const createdById = req.user.id;
+      const userId = req.user.id;
 
       for (const task of extractedTasks) {
         const title = task.title || task.name || "Untitled Task";
         const description = task.description || task.details || null;
         const status = task.status || "pending";
-        const priority = task.priority || "Medium";
-        const due_date = task.due_date || task.dueDate || null;
-        const assigneeRaw = task.assigned_to || task.assignee || null;
-
-        // Resolve assignee name/email → actual faculty UUID
-        const resolvedUserId = await resolveFacultyId(assigneeRaw);
-
-        if (assigneeRaw && !resolvedUserId) {
-          logger.warn(`Could not resolve faculty for assignee: "${assigneeRaw}" — setting user_id to NULL`);
-        }
-
-        const sql = `
-          INSERT INTO tasks (title, description, status, priority, due_date, assigned_to, user_id, created_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          RETURNING *
-        `;
-        const values = [
-          title,
-          description,
-          status,
-          priority,
-          due_date,
-          assigneeRaw,    // keeps original text name for display
-          resolvedUserId, // resolved UUID FK for RBAC filtering
-          createdById,
-        ];
+        const assignedTo = task.assigned_to || task.assignee || null;
 
         try {
-          logger.debug("Inserting task:", { title, status, assigneeRaw, resolvedUserId });
-          const { rows } = await pool.query(sql, values);
+          const { rows } = await pool.query(
+            `INSERT INTO tasks (title, description, status, assigned_to, user_id)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [title, description, status, assignedTo, userId]
+          );
           savedTasks.push(rows[0]);
-          logger.info(`Task saved: "${title}" → user_id=${resolvedUserId}`);
+          logger.info(`Task saved: "${title}" → user_id=${userId}`);
         } catch (dbErr) {
-          logger.error("DB INSERT ERROR:", dbErr.message, "| values:", values);
-          // Continue inserting remaining tasks even if one fails
+          logger.error("DB INSERT ERROR:", dbErr.message);
         }
       }
 

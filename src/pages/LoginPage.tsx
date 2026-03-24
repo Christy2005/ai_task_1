@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Lock, Mail, ArrowRight, Zap, User } from "lucide-react";
+import { Lock, Mail, ArrowRight, Zap, User, Shield } from "lucide-react";
 
 export function LoginPage() {
     const [isRegister, setIsRegister] = useState(false);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [role, setRole] = useState("faculty");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -31,7 +32,7 @@ export function LoginPage() {
                 : "http://localhost:3000/api/auth/login";
 
             const bodyData = isRegister
-                ? { name, email, password }
+                ? { name, email, password, role }
                 : { email, password };
 
             const response = await fetch(endpoint, {
@@ -49,7 +50,13 @@ export function LoginPage() {
             localStorage.setItem("token", data.token);
             localStorage.setItem("role", data.role ?? "faculty");
             login(email);
-            navigate("/", { replace: true });
+
+            const userRole = data.role ?? "faculty";
+            if (userRole === "admin") {
+                navigate("/", { replace: true });
+            } else {
+                navigate("/faculty-tasks", { replace: true });
+            }
 
 
         } catch (err: any) {
@@ -104,6 +111,24 @@ export function LoginPage() {
                                         onChange={(e) => setName(e.target.value)}
                                         className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none font-medium"
                                     />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Role (register only) */}
+                        {isRegister && (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Role</label>
+                                <div className="flex items-center gap-3 bg-glass border border-glass-border rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-accent-indigo transition-all">
+                                    <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <select
+                                        value={role}
+                                        onChange={(e) => setRole(e.target.value)}
+                                        className="flex-1 bg-transparent text-sm text-foreground focus:outline-none font-medium appearance-none cursor-pointer"
+                                    >
+                                        <option value="faculty">Faculty</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
                                 </div>
                             </div>
                         )}
