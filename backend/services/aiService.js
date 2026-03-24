@@ -89,9 +89,13 @@ Format:
 [
   {
     "title": "short title",
+    "description": "short description",
     "assignee": "",
     "dueDate": "",
-    "priority": "Low | Medium | High"
+    "priority": "Low | Medium | High",
+    "urgency": "low | medium | high",
+    "category": "meeting | assignment | personal | other",
+    "estimated_time": 1.5
   }
 ]
 

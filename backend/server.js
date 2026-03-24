@@ -10,6 +10,9 @@ import authRoutes from "./routes/authRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
+import calendarRoutes from "./routes/calendarRoutes.js";
+
+import { initReminderCron } from "./services/reminderService.js";
 
 import logger from "./utils/logger.js";
 import pool from "./database.js";
@@ -82,6 +85,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/meetings", meetingRoutes);
+app.use("/api/calendar", calendarRoutes);
 
 /* =============================
    Admin: Assign Task
@@ -200,6 +204,8 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 console.log("🚀 About to start server...");
+
+initReminderCron();
 
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);

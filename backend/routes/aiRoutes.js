@@ -9,6 +9,7 @@ import {
 import pool from "../database.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { createLogger } from "../utils/logger.js";
+import { createGoogleCalendarEvent } from "../services/googleCalendarService.js";
 
 const router = express.Router();
 const logger = createLogger("aiRoutes");
@@ -50,6 +51,7 @@ async function resolveFacultyId(nameOrEmail) {
   return rows.length > 0 ? rows[0].id : null;
 }
 
+// 🎤 ANALYZE VOICE ROUTE
 router.post(
   "/analyze-voice",
   verifyToken,
@@ -70,7 +72,7 @@ router.post(
 
       try {
         summary = await generateMeetingSummary(transcript);
-      } catch (err) {
+      } catch {
         console.log("⚠️ Summary fallback used");
       }
 
@@ -117,8 +119,8 @@ router.post(
 
       const savedTasks = [];
 
+      // 🔁 TASK LOOP
       for (const task of extractedTasks) {
-        // ✅ HARD LIMITS
         const title = (task.title || "Untitled Task")
           .split(" ")
           .slice(0, 5)
@@ -152,8 +154,38 @@ router.post(
           meetingId,
         ];
 
+        // ✅ INSERT TASK
         const { rows } = await pool.query(sql, values);
-        savedTasks.push(rows[0]);
+        const insertedTask = rows[0];
+        savedTasks.push(insertedTask);
+
+        // 📅 AUTO CREATE CALENDAR EVENT
+        if (due_date) {
+          try {
+            await pool.query(
+              `INSERT INTO calendar_events 
+               (title, description, event_date, created_by, task_id)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (task_id) DO NOTHING`,
+              [
+                insertedTask.title,
+                insertedTask.description,
+                insertedTask.due_date,
+                req.user.id,
+                insertedTask.id,
+              ]
+            );
+
+            // 🌟 CREATE GOOGLE CALENDAR EVENT
+            await createGoogleCalendarEvent(
+              insertedTask.title,
+              insertedTask.description,
+              insertedTask.due_date
+            );
+          } catch (err) {
+            console.log("⚠️ Calendar insert failed:", err.message);
+          }
+        }
       }
 
       return res.json({
@@ -168,5 +200,22 @@ router.post(
     }
   }
 );
+
+// 📅 GET CALENDAR EVENTS
+router.get("/calendar", verifyToken, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM calendar_events 
+       WHERE created_by = $1 
+       ORDER BY event_date ASC`,
+      [req.user.id]
+    );
+
+    return res.json(rows);
+  } catch (error) {
+    logger.error("[get-calendar] error:", error.message);
+    next(error);
+  }
+});
 
 export default router;
