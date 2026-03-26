@@ -102,6 +102,151 @@ function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
+// ─── Verb connectors that mark an assignment in natural speech ────────────────
+// Capture group 1 → name(s),  group 2 → task description
+const CONNECTORS = [
+  /^(.+?)\s+should\s+(.+)$/i,
+  /^(.+?)\s+will\s+(.+)$/i,
+  /^(.+?)\s+must\s+(.+)$/i,
+  /^(.+?)\s+shall\s+(.+)$/i,
+  /^(.+?)\s+needs?\s+to\s+(.+)$/i,
+  /^(.+?)\s+has\s+to\s+(.+)$/i,
+  /^(.+?)\s+is\s+going\s+to\s+(.+)$/i,
+  /^(.+?)\s+is\s+to\s+(.+)$/i,
+  /^(.+?)\s+is\s+responsible\s+for\s+(.+)$/i,
+  /^(.+?)\s+is\s+tasked\s+with\s+(.+)$/i,
+  /^(.+?)\s*:\s*(.+)$/,           // "Benita: submit tutorial"
+];
+
+// Generic non-person words that may appear before a verb
+const NOT_A_NAME =
+  /^(everyone|all|we|they|team|it|this|that|the|a|an|each|every|nobody|somebody|anyone|someone|please|also|action|task|item|note|management|faculty|department|committee|board|staff|students|he|she|i|you)$/i;
+
+// Honorifics that prefix real names
+const HONORIFIC_RE = /^(Dr\.?|Prof\.?|Mr\.?|Mrs\.?|Ms\.?|Sir)\s+/i;
+
+// Strip honorifics, possessives, and surrounding punctuation from a raw name token
+function cleanPersonName(raw) {
+  let name = raw.trim();
+  name = name.replace(/'s$/i, "");           // possessive: "Benita's" → "Benita"
+  name = name.replace(HONORIFIC_RE, "");     // "Dr. Smith" → "Smith"
+  name = name.replace(/^[,.\s]+|[,.\s]+$/g, ""); // trim punctuation edges
+  return name.trim();
+}
+
+function looksLikeName(str) {
+  const s = str.trim();
+  if (!s || s.length < 2 || s.length > 40) return false;
+  if (NOT_A_NAME.test(s)) return false;
+  // Only allow purely alphabetic characters (no digits, punctuation, etc.)
+  if (!/^[A-Za-z]+$/.test(s)) return false;
+  // Must start with uppercase (after stripping any honorific)
+  return /^[A-Z]/.test(s.replace(HONORIFIC_RE, ""));
+}
+
+function capitalize(str) {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// ─── Filler phrases that precede the real subject ────────────────────────────
+const LEADING_FILLERS =
+  /^(?:first\s+of\s+all|second(?:ly)?|third(?:ly)?|also|additionally|furthermore|moreover|next|then|finally|lastly|and|so|now|well|okay|right|please\s+note|note\s+that|importantly|as\s+discussed|as\s+mentioned)[,\s]+/i;
+
+function stripLeadingFillers(sentence) {
+  return sentence.replace(LEADING_FILLERS, "").trim();
+}
+
+// ─── Connector-verb detector (used for compound-sentence splitting) ───────────
+const CONNECTOR_VERB_RE =
+  /\b(will|should|must|shall|needs?\s+to|has\s+to|is\s+going\s+to)\b/i;
+
+// ─── Split compound assignments within one sentence ───────────────────────────
+// "A, B will do X, and C, D will do Y"
+//   → ["A, B will do X", "C, D will do Y"]
+// Only promotes a part to its own clause when it contains a connector verb;
+// otherwise re-attaches it to the previous part so "do X and Y" stays whole.
+function splitCompoundAssignments(sentence) {
+  // Split at ", and <Capital>" or " and <Capital>" boundaries
+  const parts = sentence.split(/\s*,?\s+and\s+(?=[A-Z])/);
+  if (parts.length === 1) return [sentence];
+
+  const clauses = [parts[0]];
+  for (let i = 1; i < parts.length; i++) {
+    if (CONNECTOR_VERB_RE.test(parts[i])) {
+      clauses.push(parts[i]);          // new assignment clause
+    } else {
+      clauses[clauses.length - 1] += " and " + parts[i]; // continuation of task
+    }
+  }
+  return clauses;
+}
+
+// ─── Extract tasks from raw transcript (no AI) ────────────────────────────────
+// Pipeline:
+//   sentence → strip leading fillers → split compound assignments
+//   → for each clause: match CONNECTOR → extract names + task
+//   → one task object per name: { title, assigned_to }
+//
+// Examples:
+//   "Benita should submit her tutorial"
+//     → { assigned_to: "Benita", title: "Submit her tutorial" }
+//   "Mandu, Aditya will do laundry, and Devo will clean the kitchen"
+//     → { assigned_to: "Mandu",  title: "Do laundry" }
+//     → { assigned_to: "Aditya", title: "Do laundry" }
+//     → { assigned_to: "Devo",   title: "Clean the kitchen" }
+export function extractTasksFromTranscript(transcript) {
+  if (!transcript || !transcript.trim()) return [];
+
+  const sentences = transcript
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 5);
+
+  const tasks = [];
+
+  for (const sentence of sentences) {
+    // 1. Strip leading filler words ("And", "Also", "First of all", …)
+    const stripped = stripLeadingFillers(sentence);
+
+    // 2. Split compound assignments ("A will do X, and B will do Y")
+    const clauses = splitCompoundAssignments(stripped);
+
+    for (const clause of clauses) {
+      for (const pattern of CONNECTORS) {
+        const match = clause.match(pattern);
+        if (!match) continue;
+
+        const rawNames = match[1].trim();
+        const taskPart = match[2].trim();
+        if (!taskPart || taskPart.length < 3) continue;
+
+        // 3. Split compound name groups and validate each name
+        const names = splitNames(rawNames)
+          .map(cleanPersonName)
+          .filter(looksLikeName); // alphabetic-only, starts uppercase, not a common word
+
+        if (names.length === 0) continue;
+
+        // 4. One task per name, same task content
+        for (const name of names) {
+          tasks.push({
+            title: capitalize(taskPart),
+            assigned_to: name,
+            dueDate: "",
+            priority: "Medium",
+            description: clause,
+          });
+        }
+
+        break; // First matching CONNECTOR wins for this clause
+      }
+    }
+  }
+
+  return tasks;
+}
+
 // ─── Split multiple names into separate tasks ────────────────────────────────
 // "Dr. Smith and Dr. Jones" → two tasks, one per name
 // "Alice, Bob, Charlie" → three tasks
@@ -127,11 +272,11 @@ export function splitTasksByAssignee(tasks) {
 function splitNames(nameStr) {
   if (!nameStr || nameStr.trim() === "") return [nameStr];
 
-  // Split on "and", "&", commas
+  // Split on "and", "&", commas — then filter residual "and"/"&" tokens
   const parts = nameStr
     .split(/\s*(?:,|\band\b|&)\s*/i)
     .map((n) => n.trim())
-    .filter(Boolean);
+    .filter((n) => n.length > 0 && !/^(and|&)$/i.test(n));
 
   return parts.length > 0 ? parts : [nameStr];
 }
@@ -212,12 +357,21 @@ export async function postProcessTasks(rawTasks, meetingId) {
   // 2. Normalize each task
   const processed = [];
 
+  // Placeholder names that should be treated as no assignee
+  const EMPTY_ASSIGNEE = /^(unassigned|n\/a|none|tbd|unknown|-)$/i;
+
+  // Leading conjunctions/fillers that Gemini sometimes prepends to names
+  const ASSIGNEE_FILLER_PREFIX = /^(?:and|also|additionally|then|next|finally|so|now)\s+/i;
+
   for (const task of tasks) {
     const title = task.title || task.name || "Untitled Task";
     const description = task.description || task.details || null;
     const priority = normalizePriority(task.priority);
     const dueDate = resolveDate(task.dueDate || task.due_date || task.deadline || "");
-    const assigneeName = (task.assignee || task.assigned_to || "").trim();
+    const rawAssignee = (task.assignee || task.assigned_to || "").trim();
+    // Strip leading filler words (e.g. "And Christy" → "Christy")
+    const strippedAssignee = rawAssignee.replace(ASSIGNEE_FILLER_PREFIX, "").trim();
+    const assigneeName = EMPTY_ASSIGNEE.test(strippedAssignee) ? "" : strippedAssignee;
 
     // 3. Match against DB
     let userId = null;

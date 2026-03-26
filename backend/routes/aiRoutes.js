@@ -5,7 +5,7 @@ import { speechToText, extractTaskDetails } from "../services/aiService.js";
 import pool from "../database.js";
 import { verifyToken, requireRole } from "../middleware/authMiddleware.js";
 import { createLogger } from "../utils/logger.js";
-import { parseAITasks, postProcessTasks } from "../utils/taskPostProcess.js";
+import { parseAITasks, postProcessTasks, extractTasksFromTranscript } from "../utils/taskPostProcess.js";
 
 const router = express.Router();
 const logger = createLogger("aiRoutes");
@@ -61,33 +61,41 @@ router.post(
       const transcript = await speechToText(req.file.buffer, req.file.mimetype);
       logger.info("Transcript received, length:", transcript.length);
 
-      // 2. Text → AI task extraction
-      const extractedRaw = await extractTaskDetails(transcript);
-      logger.debug("Raw AI output:", extractedRaw);
-
-      // 3. Parse + post-process (split names, resolve dates, match faculty)
+      // 2. Text → AI task extraction + fallback
       let rawTasks;
       try {
+        // Try Gemini first
+        const extractedRaw = await extractTaskDetails(transcript);
+        logger.debug("Raw AI output:", extractedRaw);
         rawTasks = parseAITasks(extractedRaw);
-      } catch (parseErr) {
-        logger.warn("JSON parse failed, returning fallback:", parseErr.message);
-        rawTasks = [
-          {
-            title: "Review Meeting",
-            assignee: "",
-            dueDate: "",
-            priority: "Medium",
-            description: transcript,
-          },
-        ];
+        logger.info(`Gemini extracted ${rawTasks.length} task(s)`);
+      } catch (aiErr) {
+        // Gemini failed OR JSON parse failed — use sentence-based extractor
+        logger.warn("AI extraction failed, using transcript extractor:", aiErr.message);
+        rawTasks = extractTasksFromTranscript(transcript);
+
+        if (rawTasks.length === 0) {
+          logger.warn("Transcript extractor found nothing, using review placeholder");
+          rawTasks = [
+            {
+              title: "[Review Required] Meeting Tasks",
+              assignee: "",
+              dueDate: "",
+              priority: "Medium",
+              description: transcript.slice(0, 500) + (transcript.length > 500 ? "…" : ""),
+              isFallback: true,
+            },
+          ];
+        } else {
+          logger.info(`Transcript extractor found ${rawTasks.length} task(s)`);
+        }
       }
 
-      // Post-process without saving — no meeting_id yet
+      // 3. Post-process without saving — no meeting_id yet
       const processedTasks = await postProcessTasks(rawTasks, null);
 
       logger.info(`Extracted ${processedTasks.length} tasks (not yet saved)`);
 
-      // Return editable tasks + transcript to frontend
       return res.json({
         transcript,
         tasks: processedTasks,
@@ -115,13 +123,19 @@ router.post(
     logger.info(`[save] Request from user ${req.user.id} (${req.user.role})`);
 
     try {
-      const { title, transcript, audioFilename, tasks } = req.body;
+      const { title, transcript, audioFilename, tasks, approveAll = false } = req.body;
 
       if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
         return res.status(400).json({ error: "No tasks to save" });
       }
 
-      // 1. Create meeting record
+      // 1. Verify user still exists in DB (guards against stale sessions)
+      const userCheck = await pool.query("SELECT id FROM users WHERE id = $1", [req.user.id]);
+      if (userCheck.rows.length === 0) {
+        return res.status(401).json({ error: "User not found. Please log in again.", code: "STALE_TOKEN" });
+      }
+
+      // 2. Create meeting record
       const meetingTitle = title || "Untitled Meeting";
       const meetingResult = await pool.query(
         `INSERT INTO meetings (title, transcript, audio_filename, created_by)
@@ -132,40 +146,48 @@ router.post(
       const meeting = meetingResult.rows[0];
       logger.info(`Meeting created: ${meeting.id} — "${meetingTitle}"`);
 
-      // 2. Re-process tasks to catch any edits (re-match faculty, etc.)
+      // 3. Re-process tasks to catch any edits (re-match faculty, etc.)
       const processedTasks = await postProcessTasks(tasks, meeting.id);
 
-      // 3. Insert each task
+      // 4. Insert each task
       const savedTasks = [];
-      const createdById = req.user.id;
+      const approvalStatus = approveAll ? "approved" : "pending_approval";
+
+      logger.info(`[save] Inserting ${processedTasks.length} task(s) — approval_status="${approvalStatus}"`);
 
       for (const task of processedTasks) {
-        const sql = `
-          INSERT INTO tasks (title, description, status, priority, due_date, assigned_to, user_id, created_by, meeting_id, approval_status)
-          VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, 'pending_approval')
-          RETURNING *
-        `;
         const values = [
-          task.title,
-          task.description,
-          task.priority,
-          task.due_date,
-          task.assignee_name,
-          task.user_id,
-          createdById,
-          meeting.id,
+          task.title,                  // $1 title
+          task.description || null,    // $2 description
+          task.priority || "Medium",   // $3 priority
+          task.due_date || null,       // $4 due_date
+          task.assignee_name || null,  // $5 assigned_to
+          task.user_id || null,        // $6 user_id
+          meeting.id,                  // $7 meeting_id
+          approvalStatus,              // $8 approval_status
         ];
 
+        logger.debug(
+          `[save] INSERT → title="${task.title}" priority="${values[2]}" user_id=${values[5]} approval="${values[7]}"`
+        );
+
         try {
-          const { rows } = await pool.query(sql, values);
+          const { rows } = await pool.query(
+            `INSERT INTO tasks
+               (title, description, priority, due_date, assigned_to, user_id, meeting_id, approval_status, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+             RETURNING *`,
+            values
+          );
           savedTasks.push(rows[0]);
-          logger.info(`Task saved: "${task.title}" → user_id=${task.user_id}`);
+          logger.info(`[save] ✓ Task "${task.title}" saved — id=${rows[0].id} user_id=${values[5]}`);
         } catch (dbErr) {
-          logger.error("DB INSERT ERROR:", dbErr.message, "| values:", values);
+          logger.error(`[save] ✗ INSERT failed for "${task.title}": ${dbErr.message}`);
+          logger.error(`[save]   values: ${JSON.stringify(values)}`);
         }
       }
 
-      logger.info(`Saved ${savedTasks.length} / ${processedTasks.length} tasks for meeting ${meeting.id}`);
+      logger.info(`[save] Done: ${savedTasks.length}/${processedTasks.length} tasks saved for meeting ${meeting.id}`);
 
       return res.json({ meeting, tasks: savedTasks });
 
@@ -221,13 +243,17 @@ router.post(
       for (const task of processedTasks) {
         try {
           const { rows } = await pool.query(
-            `INSERT INTO tasks (title, description, status, priority, due_date, assigned_to, user_id, created_by, meeting_id, approval_status)
-             VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, 'pending_approval') RETURNING *`,
-            [task.title, task.description, task.priority, task.due_date, task.assignee_name, task.user_id, req.user.id, meeting.id]
+            `INSERT INTO tasks
+               (title, description, priority, due_date, assigned_to, user_id, meeting_id, approval_status, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending_approval', 'pending')
+             RETURNING *`,
+            [task.title, task.description || null, task.priority || "Medium",
+             task.due_date || null, task.assignee_name || null, task.user_id || null, meeting.id]
           );
           savedTasks.push(rows[0]);
+          logger.info(`[analyze-voice] Task saved: "${task.title}" → user_id=${task.user_id}`);
         } catch (dbErr) {
-          logger.error("DB INSERT ERROR:", dbErr.message);
+          logger.error(`[analyze-voice] INSERT failed for "${task.title}": ${dbErr.message}`);
         }
       }
 

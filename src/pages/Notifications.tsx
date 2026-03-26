@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Info, AlertTriangle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 function getToken() { return localStorage.getItem("token") ?? ""; }
 
@@ -42,7 +43,14 @@ function timeAgo(dateStr: string) {
     return `${days}d ago`;
 }
 
+const roleSubtitle: Record<string, string> = {
+    admin: "System alerts, unregistered faculty, and all activity.",
+    hod: "Pending approvals and task notifications.",
+    faculty: "Your assigned tasks and updates.",
+};
+
 export function Notifications() {
+    const { role } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -89,7 +97,7 @@ export function Notifications() {
                     <h1 className="text-4xl font-black text-foreground tracking-tight">
                         <span className="text-gradient-indigo">Notifications</span>
                     </h1>
-                    <p className="text-muted-foreground mt-1">Stay updated on tasks and meetings.</p>
+                    <p className="text-muted-foreground mt-1">{roleSubtitle[role ?? "faculty"]}</p>
                 </div>
                 <button
                     onClick={markAllRead}

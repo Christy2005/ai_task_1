@@ -52,6 +52,9 @@ export function LoginPage() {
             if (!response.ok) throw new Error(data.error || "Something went wrong");
             if (!data.token) throw new Error("No token received from server");
 
+            // Clear any stale token before storing the new one
+            localStorage.removeItem("token");
+
             // data.user = { id, name, email, role }
             const userData = data.user || {
                 id: "",

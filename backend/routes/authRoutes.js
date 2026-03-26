@@ -52,13 +52,46 @@ router.post("/register", async (req, res, next) => {
     );
 
     const user = newUser.rows[0];
+
+    // ── Claim any tasks that were extracted before this user registered ────────
+    // Matches on exact name OR first-word prefix (e.g. extracted "Mandu" →
+    // registered "Mandu Kumar", or extracted "Mandu Kumar" → stored "Mandu").
+    // Only touches tasks that still have user_id = NULL.
+    if (safeRole === "faculty" || safeRole === "hod") {
+      try {
+        const { rows: claimed, rowCount } = await pool.query(
+          `UPDATE tasks
+           SET user_id = $1
+           WHERE user_id IS NULL
+             AND assigned_to IS NOT NULL
+             AND assigned_to <> ''
+             AND (
+               LOWER(assigned_to) = LOWER($2)
+               OR LOWER($2)         LIKE LOWER(assigned_to) || ' %'
+               OR LOWER(assigned_to) LIKE LOWER($2)          || ' %'
+             )
+           RETURNING id, title, assigned_to`,
+          [user.id, user.name]
+        );
+        if (rowCount > 0) {
+          logger.info(
+            `[register] Claimed ${rowCount} unassigned task(s) for "${user.name}":`,
+            claimed.map((t) => `"${t.title}"`).join(", ")
+          );
+        }
+      } catch (claimErr) {
+        // Non-fatal — registration still succeeds even if task claim fails
+        logger.error("[register] Task claim failed:", claimErr.message);
+      }
+    }
+
     const token = jwt.sign(
       { id: user.id, name: user.name, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    logger.info(`Registered: ${user.email} (${user.role})`);
+    logger.info(`[register] Success: ${user.email} (${user.role}) id="${user.id}"`);
     return res.status(201).json({
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
@@ -100,13 +133,16 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    // Sign JWT using fields from the DB row — never from request body
     const token = jwt.sign(
       { id: user.id, name: user.name, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    logger.info(`Login: ${user.email} (${user.role})`);
+    logger.info(`[login] Success: ${user.email} (${user.role}) id="${user.id}"`);
+    logger.debug(`[login] Signed token with id="${user.id}" role="${user.role}"`);
+
     return res.json({
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },

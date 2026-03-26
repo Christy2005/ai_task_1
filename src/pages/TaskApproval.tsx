@@ -21,6 +21,7 @@ interface PendingTask {
 export function TaskApproval() {
     const [tasks, setTasks] = useState<PendingTask[]>([]);
     const [loading, setLoading] = useState(true);
+    const [processingId, setProcessingId] = useState<string | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -34,30 +35,48 @@ export function TaskApproval() {
     }, []);
 
     const handleApprove = async (taskId: string) => {
+        setProcessingId(taskId);
         try {
             const res = await fetch(`http://localhost:3000/api/tasks/${taskId}/approve`, {
                 method: "PATCH",
-                headers: { Authorization: `Bearer ${getToken()}` },
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${getToken()}`,
+                },
             });
-            if (!res.ok) throw new Error("Failed to approve");
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || `Failed to approve (${res.status})`);
+            }
             setTasks((prev) => prev.filter((t) => t.id !== taskId));
-        } catch (err) {
+        } catch (err: any) {
             console.error("Approve error:", err);
-            alert("Failed to approve task");
+            alert(err.message || "Failed to approve task");
+        } finally {
+            setProcessingId(null);
         }
     };
 
     const handleReject = async (taskId: string) => {
+        setProcessingId(taskId);
         try {
             const res = await fetch(`http://localhost:3000/api/tasks/${taskId}/reject`, {
                 method: "PATCH",
-                headers: { Authorization: `Bearer ${getToken()}` },
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${getToken()}`,
+                },
             });
-            if (!res.ok) throw new Error("Failed to reject");
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || `Failed to reject (${res.status})`);
+            }
             setTasks((prev) => prev.filter((t) => t.id !== taskId));
-        } catch (err) {
+        } catch (err: any) {
             console.error("Reject error:", err);
-            alert("Failed to reject task");
+            alert(err.message || "Failed to reject task");
+        } finally {
+            setProcessingId(null);
         }
     };
 
@@ -78,8 +97,8 @@ export function TaskApproval() {
                 <div className="grid gap-4">
                     {tasks.length === 0 ? (
                         <div className="glass-card glass-shadow rounded-[2rem] p-12 text-center">
-                            <div className="w-16 h-16 rounded-3xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
-                                <CheckCircle className="h-8 w-8 text-indigo-300" />
+                            <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle className="h-8 w-8 text-indigo-400" />
                             </div>
                             <p className="text-muted-foreground font-semibold">No pending approvals -- all clear!</p>
                         </div>
@@ -102,35 +121,37 @@ export function TaskApproval() {
                                         </span>
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                        Assigned to: <span className="font-semibold text-slate-700">{task.assigned_to_name || task.assigned_to || "Unassigned"}</span>
+                                        Assigned to: <span className="font-semibold text-foreground">{task.assigned_to_name || task.assigned_to || "Unassigned"}</span>
                                         {task.due_date && <> &middot; Due: {task.due_date}</>}
                                     </p>
                                     {task.meeting_title && (
-                                        <p className="text-xs text-indigo-500 font-medium">Meeting: {task.meeting_title}</p>
+                                        <p className="text-xs text-indigo-500 dark:text-indigo-400 font-medium">Meeting: {task.meeting_title}</p>
                                     )}
                                     {task.description && (
-                                        <p className="text-xs text-slate-500 mt-1">{task.description}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
                                     )}
                                 </div>
 
                                 <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
                                     <button
                                         onClick={() => navigate(`/tasks/${task.id}`)}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-muted-foreground bg-white/60 hover:bg-white/90 rounded-2xl transition-all border border-white/50"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-foreground bg-background/60 dark:bg-white/10 hover:bg-background/90 dark:hover:bg-white/20 rounded-2xl transition-all border border-border"
                                     >
                                         <Info className="h-4 w-4" /> Details
                                     </button>
                                     <button
+                                        disabled={processingId === task.id}
                                         onClick={() => handleReject(task.id)}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-rose-600 bg-rose-50/80 hover:bg-rose-100 rounded-2xl transition-all border border-rose-100"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-rose-600 bg-rose-50/80 hover:bg-rose-100 rounded-2xl transition-all border border-rose-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <XCircle className="h-4 w-4" /> Reject
+                                        <XCircle className="h-4 w-4" /> {processingId === task.id ? "…" : "Reject"}
                                     </button>
                                     <button
+                                        disabled={processingId === task.id}
                                         onClick={() => handleApprove(task.id)}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 rounded-2xl transition-all shadow-lg shadow-emerald-200/60"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 rounded-2xl transition-all shadow-lg shadow-emerald-200/60 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <CheckCircle className="h-4 w-4" /> Approve
+                                        <CheckCircle className="h-4 w-4" /> {processingId === task.id ? "Saving…" : "Approve"}
                                     </button>
                                 </div>
                             </div>

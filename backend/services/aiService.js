@@ -239,14 +239,6 @@ ${text}
 
 JSON:`;
 
-  try {
-    // retryWrapper calls callGemini at most twice (original + one retry on 429)
-    return await retryWrapper(() => callGemini(prompt));
-  } catch (err) {
-    logger.error("Gemini failed after retry — using fallback:", err.message);
-
-    // Return fallback tasks as a JSON string so callers get a consistent shape
-    const fallbackTasks = fallbackExtraction(text);
-    return JSON.stringify(fallbackTasks);
-  }
+  // retryWrapper calls callGemini at most twice (original + one retry on 429)
+  return await retryWrapper(() => callGemini(prompt));
 }

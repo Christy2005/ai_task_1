@@ -1,6 +1,6 @@
 import express from "express";
 import pool from "../database.js";
-import { verifyToken, requireRole, requireAdmin } from "../middleware/authMiddleware.js";
+import { verifyToken } from "../middleware/authMiddleware.js";
 import { createLogger } from "../utils/logger.js";
 
 const router = express.Router();
@@ -9,21 +9,48 @@ const logger = createLogger("notificationRoutes");
 router.use(verifyToken);
 
 // ─── GET /api/notifications ──────────────────────────────────────────────────
-// Admin only — sees all notifications targeted to admin role + personal
-router.get("/", requireAdmin, async (req, res, next) => {
+// Role-based:
+//   admin   → all admin-targeted notifications + personal
+//   hod     → hod-targeted notifications + personal
+//   faculty → personal only (task assignments)
+router.get("/", async (req, res, next) => {
   try {
-    const { id: userId } = req.user;
+    const { id: userId, role } = req.user;
 
-    const { rows } = await pool.query(
-      `SELECT n.*, m.title AS meeting_title
-       FROM notifications n
-       LEFT JOIN meetings m ON n.meeting_id = m.id
-       WHERE n.target_role = 'admin' OR n.user_id = $1
-       ORDER BY n.created_at DESC
-       LIMIT 50`,
-      [userId]
-    );
+    let query;
+    let params;
 
+    if (role === "admin") {
+      query = `
+        SELECT n.*, m.title AS meeting_title
+        FROM notifications n
+        LEFT JOIN meetings m ON n.meeting_id = m.id
+        WHERE n.target_role = 'admin' OR n.user_id = $1
+        ORDER BY n.created_at DESC
+        LIMIT 50`;
+      params = [userId];
+    } else if (role === "hod") {
+      query = `
+        SELECT n.*, m.title AS meeting_title
+        FROM notifications n
+        LEFT JOIN meetings m ON n.meeting_id = m.id
+        WHERE n.target_role = 'hod' OR n.user_id = $1
+        ORDER BY n.created_at DESC
+        LIMIT 50`;
+      params = [userId];
+    } else {
+      // faculty — personal notifications only
+      query = `
+        SELECT n.*, m.title AS meeting_title
+        FROM notifications n
+        LEFT JOIN meetings m ON n.meeting_id = m.id
+        WHERE n.user_id = $1
+        ORDER BY n.created_at DESC
+        LIMIT 50`;
+      params = [userId];
+    }
+
+    const { rows } = await pool.query(query, params);
     return res.json({ notifications: rows });
   } catch (error) {
     logger.error("GET /notifications error:", error.message);
@@ -32,11 +59,24 @@ router.get("/", requireAdmin, async (req, res, next) => {
 });
 
 // ─── PATCH /api/notifications/:id/read ───────────────────────────────────────
+// Any authenticated user can mark their own notification as read
 router.patch("/:id/read", async (req, res, next) => {
   try {
+    const { id: userId, role } = req.user;
+
+    // Admins can mark any notification; others only their own
+    const ownershipClause =
+      role === "admin" ? "" : "AND (user_id = $2 OR target_role = $3)";
+    const params =
+      role === "admin"
+        ? [req.params.id]
+        : [req.params.id, userId, role];
+
     const { rows } = await pool.query(
-      "UPDATE notifications SET is_read = TRUE WHERE id = $1 RETURNING *",
-      [req.params.id]
+      `UPDATE notifications SET is_read = TRUE
+       WHERE id = $1 ${ownershipClause}
+       RETURNING *`,
+      params
     );
 
     if (rows.length === 0) {
@@ -51,15 +91,27 @@ router.patch("/:id/read", async (req, res, next) => {
 });
 
 // ─── POST /api/notifications/mark-all-read ───────────────────────────────────
-// Admin only
-router.post("/mark-all-read", requireAdmin, async (req, res, next) => {
+// Works for all roles — marks the notifications visible to this user as read
+router.post("/mark-all-read", async (req, res, next) => {
   try {
-    const { id: userId } = req.user;
+    const { id: userId, role } = req.user;
 
-    await pool.query(
-      "UPDATE notifications SET is_read = TRUE WHERE target_role = 'admin' OR user_id = $1",
-      [userId]
-    );
+    if (role === "admin") {
+      await pool.query(
+        "UPDATE notifications SET is_read = TRUE WHERE target_role = 'admin' OR user_id = $1",
+        [userId]
+      );
+    } else if (role === "hod") {
+      await pool.query(
+        "UPDATE notifications SET is_read = TRUE WHERE target_role = 'hod' OR user_id = $1",
+        [userId]
+      );
+    } else {
+      await pool.query(
+        "UPDATE notifications SET is_read = TRUE WHERE user_id = $1",
+        [userId]
+      );
+    }
 
     return res.json({ message: "All notifications marked as read" });
   } catch (error) {

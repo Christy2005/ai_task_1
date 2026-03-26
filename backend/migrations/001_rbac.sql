@@ -22,11 +22,11 @@ UPDATE users SET role = 'faculty' WHERE role NOT IN ('admin', 'faculty');
 
 -- 2. Add user_id (assigned faculty) to tasks — INTEGER FK → users.id
 ALTER TABLE tasks
-  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL;
 
--- 3. Add created_by (task creator) to tasks — INTEGER FK → users.id
+-- 3. Add created_by (task creator) to tasks — UUID FK → users.id
 ALTER TABLE tasks
-  ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL;
 
 -- 4. Add priority column if it doesn't exist
 ALTER TABLE tasks

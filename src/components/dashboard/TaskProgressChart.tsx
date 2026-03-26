@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { RefreshCw } from "lucide-react";
 import {
     BarChart,
     Bar,
@@ -9,11 +10,18 @@ import {
     CartesianGrid,
 } from "recharts";
 
+const POLL_INTERVAL_MS = 30_000; // re-fetch every 30 s
+
 /* ─── Types ──────────────────────────── */
 interface FacultyStat {
-    name: string;       // first name only (truncated)
+    name: string;
     completed: number;
     pending: number;
+}
+
+interface Props {
+    /** Increment this from the parent to trigger an immediate re-fetch. */
+    refreshTrigger?: number;
 }
 
 function getToken() {
@@ -37,33 +45,54 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 /* ═══════════════════════════════════════
    Task Progress Chart
-   Fetches real data from /api/admin/task-stats
+   • Polls /api/admin/task-stats every 30 s
+   • Accepts refreshTrigger prop for on-demand re-fetch
+   • Manual refresh button in header
 ═══════════════════════════════════════ */
-const TaskProgressChart = () => {
+const TaskProgressChart = ({ refreshTrigger = 0 }: Props) => {
     const [data, setData] = useState<FacultyStat[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const response = await fetch("http://localhost:3000/api/admin/task-stats", {
-                    headers: { Authorization: `Bearer ${getToken()}` },
-                });
-                const result = await response.json();
-                if (Array.isArray(result)) setData(result);
-            } catch (error) {
-                console.error("Failed to fetch task stats:", error);
-            } finally {
-                setLoading(false);
+    const fetchStats = useCallback(async (isManual = false) => {
+        if (isManual) setRefreshing(true);
+        try {
+            const response = await fetch("http://localhost:3000/api/admin/task-stats", {
+                headers: { Authorization: `Bearer ${getToken()}` },
+            });
+            const result = await response.json();
+            if (Array.isArray(result)) {
+                setData(result);
+                setLastUpdated(new Date());
             }
-        };
-        fetchStats();
+        } catch (error) {
+            console.error("Failed to fetch task stats:", error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, []);
+
+    // Initial load + polling
+    useEffect(() => {
+        fetchStats();
+        timerRef.current = setInterval(() => fetchStats(), POLL_INTERVAL_MS);
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [fetchStats]);
+
+    // Re-fetch when parent signals a change (e.g. after task status update)
+    useEffect(() => {
+        if (refreshTrigger > 0) fetchStats();
+    }, [refreshTrigger, fetchStats]);
 
     return (
         <div className="glass-card glass-shadow rounded-[2rem] p-8 w-full overflow-hidden">
             {/* Header */}
-            <div className="mb-6 flex items-start justify-between">
+            <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
                     <h3 className="text-xl font-black text-white tracking-tight">
                         Institutional{" "}
@@ -71,22 +100,38 @@ const TaskProgressChart = () => {
                     </h3>
                     <p className="text-slate-400 text-sm mt-0.5 font-medium">
                         Completed vs. Pending tasks by Faculty
+                        {lastUpdated && (
+                            <span className="ml-2 text-slate-500 text-xs">
+                                · updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                        )}
                     </p>
                 </div>
-                {/* Legend */}
-                <div className="flex gap-4">
-                    <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#6366F1]" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Completed
-                        </span>
+                <div className="flex items-center gap-4 shrink-0">
+                    {/* Legend */}
+                    <div className="flex gap-3">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#6366F1]" />
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                Completed
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#F472B6]" />
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                Pending
+                            </span>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#F472B6]" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Pending
-                        </span>
-                    </div>
+                    {/* Manual refresh */}
+                    <button
+                        onClick={() => fetchStats(true)}
+                        disabled={refreshing}
+                        title="Refresh now"
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40"
+                    >
+                        <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                    </button>
                 </div>
             </div>
 

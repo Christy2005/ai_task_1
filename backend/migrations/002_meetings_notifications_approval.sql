@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS meetings (
   audio_filename VARCHAR(500),
   duration    VARCHAR(50),
   status      VARCHAR(20) DEFAULT 'processed',
-  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -37,7 +37,7 @@ ALTER TABLE tasks
   CHECK (approval_status IN ('pending_approval', 'approved', 'rejected'));
 
 ALTER TABLE tasks
-  ADD COLUMN IF NOT EXISTS approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES users(id) ON DELETE SET NULL;
 
 ALTER TABLE tasks
   ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   message     TEXT,
   is_read     BOOLEAN DEFAULT FALSE,
   target_role VARCHAR(20) DEFAULT 'admin',
-  user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
   meeting_id  UUID REFERENCES meetings(id) ON DELETE SET NULL,
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

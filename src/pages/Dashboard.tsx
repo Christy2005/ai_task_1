@@ -1,30 +1,99 @@
+import { useState, useEffect } from "react";
 import {
-    Users, FileAudio, CheckCircle, Clock, TrendingUp,
+    Users, FileAudio, CheckCircle, Clock,
     ArrowRight, Calendar, Bell, Sparkles, Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTasks } from "@/context/TaskContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import TaskProgressChart from "@/components/dashboard/TaskProgressChart";
 
+function getToken() { return localStorage.getItem("token") ?? ""; }
+
+interface BackendTask {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    due_date: string | null;
+    assigned_to_name: string | null;
+    approval_status: string;
+}
+
+interface DashboardStats {
+    totalTasks: number;
+    pendingApprovals: number;
+    completedTasks: number;
+    totalMeetings: number;
+    activeFaculty: number;
+    unreadNotifications: number;
+}
+
+const DASHBOARD_POLL_MS = 30_000;
+
 export function Dashboard() {
-    const { tasks } = useTasks();
     const { user } = useAuth();
     const navigate = useNavigate();
+    const [recentTasks, setRecentTasks] = useState<BackendTask[]>([]);
+    const [chartRefreshTrigger, setChartRefreshTrigger] = useState(0);
+    const [stats, setStats] = useState<DashboardStats>({
+        totalTasks: 0,
+        pendingApprovals: 0,
+        completedTasks: 0,
+        totalMeetings: 0,
+        activeFaculty: 0,
+        unreadNotifications: 0,
+    });
 
-    const totalTasks = tasks.length;
-    const pendingApprovals = tasks.filter(
-        (t) => t.category === "Approval" && t.status === "Pending"
-    ).length;
-    const recentTasks = tasks.slice(0, 3);
+    const fetchDashboard = () => {
+        const headers = { Authorization: `Bearer ${getToken()}` };
 
-    const stats = [
+        Promise.all([
+            fetch("http://localhost:3000/api/tasks", { headers }).then((r) => r.json()),
+            fetch("http://localhost:3000/api/tasks/pending-approval", { headers }).then((r) => r.json()),
+            fetch("http://localhost:3000/api/meetings", { headers }).then((r) => r.json()).catch(() => ({ meetings: [] })),
+            fetch("http://localhost:3000/api/auth/faculty", { headers }).then((r) => r.json()).catch(() => ({ faculty: [] })),
+            fetch("http://localhost:3000/api/notifications", { headers }).then((r) => r.json()).catch(() => ({ notifications: [] })),
+        ]).then(([tasksData, pendingData, meetingsData, facultyData, notifData]) => {
+            const allTasks: BackendTask[] = tasksData.tasks || [];
+            const pendingTasks: BackendTask[] = pendingData.tasks || [];
+            const meetings = meetingsData.meetings || [];
+            const faculty = facultyData.faculty || [];
+            const notifications = notifData.notifications || [];
+
+            const nextCompleted = allTasks.filter((t) => t.status === "completed").length;
+
+            setStats((prev) => {
+                // If completed count changed, tell the chart to re-fetch immediately
+                if (prev.completedTasks !== nextCompleted) {
+                    setChartRefreshTrigger((n) => n + 1);
+                }
+                return {
+                    totalTasks: allTasks.length,
+                    pendingApprovals: pendingTasks.length,
+                    completedTasks: nextCompleted,
+                    totalMeetings: meetings.length,
+                    activeFaculty: faculty.length,
+                    unreadNotifications: notifications.filter((n: any) => !n.is_read).length,
+                };
+            });
+
+            setRecentTasks(allTasks.slice(0, 3));
+        }).catch((err) => console.error("Dashboard stats error:", err));
+    };
+
+    useEffect(() => {
+        fetchDashboard();
+        const timer = setInterval(fetchDashboard, DASHBOARD_POLL_MS);
+        return () => clearInterval(timer);
+    }, []);
+
+    const statCards = [
         {
             name: "Total Tasks",
-            value: totalTasks.toString(),
-            change: "+12%",
-            trend: "up",
+            value: stats.totalTasks.toString(),
+            sub: `${stats.completedTasks} completed`,
             icon: CheckCircle,
             gradientFrom: "from-blue-400",
             gradientTo: "to-indigo-500",
@@ -32,19 +101,17 @@ export function Dashboard() {
         },
         {
             name: "Pending Approvals",
-            value: pendingApprovals.toString(),
-            change: "-5%",
-            trend: "down",
+            value: stats.pendingApprovals.toString(),
+            sub: "awaiting review",
             icon: Clock,
             gradientFrom: "from-purple-400",
             gradientTo: "to-pink-500",
             glowColor: "rgba(244,114,182,0.35)",
         },
         {
-            name: "Minutes Uploaded",
-            value: "45",
-            change: "+28%",
-            trend: "up",
+            name: "Meetings Uploaded",
+            value: stats.totalMeetings.toString(),
+            sub: "transcribed",
             icon: FileAudio,
             gradientFrom: "from-orange-400",
             gradientTo: "to-red-500",
@@ -52,9 +119,8 @@ export function Dashboard() {
         },
         {
             name: "Active Faculty",
-            value: "32",
-            change: "+4%",
-            trend: "up",
+            value: stats.activeFaculty.toString(),
+            sub: `${stats.unreadNotifications} unread alerts`,
             icon: Users,
             gradientFrom: "from-emerald-400",
             gradientTo: "to-teal-500",
@@ -124,7 +190,7 @@ export function Dashboard() {
 
             {/* ── Stats Grid ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-                {stats.map((stat) => (
+                {statCards.map((stat) => (
                     <div
                         key={stat.name}
                         className="glass-card glass-shadow rounded-[2rem] p-7 relative overflow-hidden group hover:scale-[1.03] transition-all duration-300 cursor-default"
@@ -153,24 +219,14 @@ export function Dashboard() {
                         </p>
                         <div className="flex items-baseline gap-2">
                             <p className="text-5xl font-black text-foreground">{stat.value}</p>
-                            <span
-                                className={cn(
-                                    "flex items-center text-xs font-semibold",
-                                    stat.trend === "up" ? "text-emerald-500" : "text-rose-500"
-                                )}
-                            >
-                                <TrendingUp
-                                    className={cn("h-3 w-3 mr-0.5", stat.trend === "down" && "rotate-180")}
-                                />
-                                {stat.change}
-                            </span>
+                            <span className="text-xs text-muted-foreground font-medium">{stat.sub}</span>
                         </div>
                     </div>
                 ))}
             </div>
 
             {/* ── Task Progress Chart ── */}
-            <TaskProgressChart />
+            <TaskProgressChart refreshTrigger={chartRefreshTrigger} />
 
             {/* ── Bottom Grid ── */}
             <div className="grid gap-6 md:grid-cols-2">
@@ -188,60 +244,60 @@ export function Dashboard() {
                     <div className="p-7 space-y-5">
                         {recentTasks.length === 0 ? (
                             <div className="text-center py-8">
-                                <div className="w-16 h-16 rounded-3xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
-                                    <CheckCircle className="h-8 w-8 text-indigo-300" />
+                                <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-3">
+                                    <CheckCircle className="h-8 w-8 text-indigo-400" />
                                 </div>
-                                <p className="text-sm text-slate-400 font-medium">No tasks yet</p>
+                                <p className="text-sm text-muted-foreground font-medium">No tasks yet</p>
                             </div>
                         ) : (
-                            recentTasks.map((task) => (
-                                <div
-                                    key={task.id}
-                                    className="flex items-start gap-4 group cursor-pointer hover:bg-white/40 rounded-2xl p-3 -m-3 transition-all"
-                                    onClick={() => navigate(`/tasks/${task.id}`)}
-                                >
+                            recentTasks.map((task) => {
+                                const assigneeName = task.assigned_to_name || "UN";
+                                const initials = assigneeName.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
+                                return (
                                     <div
-                                        className={cn(
-                                            "w-10 h-10 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5",
-                                            task.priority === "High"
-                                                ? "bg-gradient-to-br from-red-400 to-rose-500 text-white"
-                                                : task.priority === "Medium"
-                                                    ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
-                                                    : "bg-gradient-to-br from-blue-400 to-indigo-500 text-white"
-                                        )}
+                                        key={task.id}
+                                        className="flex items-start gap-4 group cursor-pointer hover:bg-white/20 dark:hover:bg-white/5 rounded-2xl p-3 -m-3 transition-all"
+                                        onClick={() => navigate(`/tasks/${task.id}`)}
                                     >
-                                        {task.assignee
-                                            .split(" ")
-                                            .map((n: string) => n[0])
-                                            .join("")
-                                            .substring(0, 2)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">
-                                                {task.title}
-                                            </p>
-                                            <span
-                                                className={cn(
-                                                    "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
-                                                    task.status === "Completed"
-                                                        ? "bg-emerald-100 text-emerald-700"
-                                                        : task.status === "Pending"
-                                                            ? "bg-amber-100 text-amber-700"
-                                                            : "bg-blue-100 text-blue-700"
-                                                )}
-                                            >
-                                                {task.status}
-                                            </span>
+                                        <div
+                                            className={cn(
+                                                "w-10 h-10 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5",
+                                                task.priority === "High"
+                                                    ? "bg-gradient-to-br from-red-400 to-rose-500 text-white"
+                                                    : task.priority === "Medium"
+                                                        ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
+                                                        : "bg-gradient-to-br from-blue-400 to-indigo-500 text-white"
+                                            )}
+                                        >
+                                            {initials}
                                         </div>
-                                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{task.description}</p>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            <Calendar className="h-3 w-3 text-slate-400" />
-                                            <span className="text-xs text-slate-400">Due: {task.dueDate}</span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-sm font-semibold text-foreground truncate group-hover:text-indigo-500 transition-colors">
+                                                    {task.title}
+                                                </p>
+                                                <span
+                                                    className={cn(
+                                                        "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
+                                                        task.status === "completed"
+                                                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
+                                                            : task.status === "in progress"
+                                                                ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400"
+                                                                : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400"
+                                                    )}
+                                                >
+                                                    {task.status}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <Calendar className="h-3 w-3 text-muted-foreground" />
+                                                <span className="text-xs text-muted-foreground">Due: {task.due_date || "—"}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>

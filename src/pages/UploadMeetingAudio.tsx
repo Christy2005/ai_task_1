@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Download, Pencil, Save, Trash2 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
@@ -6,28 +6,55 @@ import { generateMeetingPDF } from "@/utils/exportPdf";
 
 function getToken() { return localStorage.getItem("token") ?? ""; }
 
+const LS_KEY = "upload_audio_draft";
+
 interface EditableTask {
   title: string;
   assignee_name: string;
   due_date: string;
   priority: string;
   description: string;
-  user_id: number | null;
+  user_id: string | null;
   is_registered: boolean;
+  is_fallback?: boolean;
+}
+
+interface Draft {
+  transcript: string | null;
+  editableTasks: EditableTask[];
+  meetingTitle: string;
+  audioFilename: string;
+}
+
+function loadDraft(): Draft | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function UploadMeetingAudio() {
+  const draft = loadDraft();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [transcript, setTranscript] = useState<string | null>(null);
-  const [editableTasks, setEditableTasks] = useState<EditableTask[]>([]);
+  const [transcript, setTranscript] = useState<string | null>(draft?.transcript ?? null);
+  const [editableTasks, setEditableTasks] = useState<EditableTask[]>(draft?.editableTasks ?? []);
   const [saved, setSaved] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
-  const [meetingTitle, setMeetingTitle] = useState("General Discussion");
-  const [audioFilename, setAudioFilename] = useState("");
+  const [meetingTitle, setMeetingTitle] = useState(draft?.meetingTitle ?? "Meeting");
+  const [audioFilename, setAudioFilename] = useState(draft?.audioFilename ?? "");
   const { role } = useAuth();
+
+  // Persist draft to localStorage whenever the extracted data changes
+  useEffect(() => {
+    if (transcript || editableTasks.length > 0) {
+      localStorage.setItem(LS_KEY, JSON.stringify({ transcript, editableTasks, meetingTitle, audioFilename }));
+    }
+  }, [transcript, editableTasks, meetingTitle, audioFilename]);
 
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
@@ -37,12 +64,14 @@ export function UploadMeetingAudio() {
 
   // ── STEP 1: Extract tasks (not saved yet) ──────────────────────────────────
   const handleExtract = async () => {
-    if (!file) return alert("Please select a file.");
+    if (!file) return alert("Please select an audio file.");
+    if (!meetingTitle.trim()) return alert("Meeting title is required.");
 
     setLoading(true);
     setSaved(false);
     setEditableTasks([]);
     setTranscript(null);
+    localStorage.removeItem(LS_KEY);
 
     const formData = new FormData();
     formData.append("audio", file);
@@ -79,6 +108,7 @@ export function UploadMeetingAudio() {
         description: t.description || "",
         user_id: t.user_id || null,
         is_registered: t.is_registered || false,
+        is_fallback: t.isFallback || false,
       }));
 
       setEditableTasks(tasks);
@@ -97,7 +127,7 @@ export function UploadMeetingAudio() {
   };
 
   // ── STEP 2: Save edited tasks ──────────────────────────────────────────────
-  const handleSave = async () => {
+  const handleSave = async (approveAll = false) => {
     if (editableTasks.length === 0) return;
     setSaving(true);
 
@@ -112,6 +142,7 @@ export function UploadMeetingAudio() {
           title: meetingTitle,
           transcript,
           audioFilename,
+          approveAll,
           tasks: editableTasks.map((t) => ({
             title: t.title,
             assignee: t.assignee_name,
@@ -131,7 +162,9 @@ export function UploadMeetingAudio() {
 
       const data = await res.json();
       setSaved(true);
-      triggerToast(`Saved ${data.tasks?.length || 0} tasks to meeting "${data.meeting?.title}".`);
+      localStorage.removeItem(LS_KEY);
+      const label = approveAll ? "approved & assigned" : "pending HOD approval";
+      triggerToast(`Saved ${data.tasks?.length || 0} tasks (${label}) to meeting "${data.meeting?.title}".`);
       setFile(null);
     } catch (err: any) {
       console.error("Save error:", err);
@@ -155,7 +188,7 @@ export function UploadMeetingAudio() {
   const addTask = () => {
     setEditableTasks((prev) => [
       ...prev,
-      { title: "", assignee_name: "", due_date: "", priority: "Medium", description: "", user_id: null, is_registered: false },
+      { title: "", assignee_name: "", due_date: "", priority: "Medium", description: "", user_id: null, is_registered: false } as EditableTask,
     ]);
   };
 
@@ -163,10 +196,10 @@ export function UploadMeetingAudio() {
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-4xl font-black text-slate-800 tracking-tight">
+        <h1 className="text-4xl font-black text-foreground tracking-tight">
           Upload <span className="text-gradient-indigo">Audio</span>
         </h1>
-        <p className="text-slate-500 mt-1">Transcribe meeting recordings and extract tasks with AI.</p>
+        <p className="text-muted-foreground mt-1">Transcribe meeting recordings and extract tasks with AI.</p>
       </div>
 
       {/* Upload Card */}
@@ -175,18 +208,21 @@ export function UploadMeetingAudio() {
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-200/50">
             <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
           </div>
-          <h2 className="text-xl font-bold text-slate-800">AI Meeting Transcriber</h2>
+          <h2 className="text-xl font-bold text-foreground">AI Meeting Transcriber</h2>
         </div>
 
         {/* Meeting title input */}
         <div>
-          <label className="text-sm font-semibold text-slate-600 mb-1 block">Meeting Title</label>
+          <label className="text-sm font-semibold text-foreground mb-1 block">
+            Meeting Title <span className="text-rose-500">*</span>
+          </label>
           <input
             type="text"
             value={meetingTitle}
             onChange={(e) => setMeetingTitle(e.target.value)}
-            className="w-full px-4 py-3 rounded-2xl border border-indigo-200 bg-white/60 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="w-full px-4 py-3 rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-white/60 dark:bg-white/10 text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-muted-foreground"
             placeholder="e.g. Faculty Board Meeting"
+            required
           />
         </div>
 
@@ -212,8 +248,8 @@ export function UploadMeetingAudio() {
       {/* Transcript */}
       {transcript && (
         <div className="glass-card glass-shadow rounded-[2rem] p-8 border-l-4 border-indigo-400">
-          <h3 className="text-lg font-bold mb-4 text-indigo-800">Transcript</h3>
-          <p className="transcript-box transcript-text text-slate-700 bg-white/60 p-5 rounded-2xl leading-relaxed">
+          <h3 className="text-lg font-bold mb-4 text-foreground">Transcript</h3>
+          <p className="transcript-box transcript-text text-foreground bg-white/40 dark:bg-white/5 p-5 rounded-2xl leading-relaxed">
             {transcript}
           </p>
         </div>
@@ -237,11 +273,17 @@ export function UploadMeetingAudio() {
           {editableTasks.map((task, idx) => (
             <div key={idx} className="glass-card p-6 rounded-[2rem] border border-white/20 bg-white/10 backdrop-blur-xl space-y-3">
               <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                   <Pencil size={12} />
                   Task {idx + 1}
-                  {!task.is_registered && task.assignee_name && (
-                    <span className="text-amber-600 font-semibold">(unregistered)</span>
+                  {task.is_fallback && (
+                    <span className="text-orange-600 font-semibold">(AI parse failed — review required)</span>
+                  )}
+                  {!task.is_fallback && !task.is_registered && task.assignee_name && (
+                    <span className="text-amber-600 font-semibold">(unregistered faculty)</span>
+                  )}
+                  {!task.is_fallback && task.is_registered && task.assignee_name && (
+                    <span className="text-emerald-600 font-semibold">(registered ✓)</span>
                   )}
                 </div>
                 <button onClick={() => removeTask(idx)} className="text-rose-400 hover:text-rose-600 p-1">
@@ -292,14 +334,26 @@ export function UploadMeetingAudio() {
             </div>
           ))}
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-200/60 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <Save size={18} />
-            {saving ? "Saving..." : "Confirm & Save Tasks"}
-          </button>
+          <div className={`grid gap-3 ${(role === "admin" || role === "hod") ? "sm:grid-cols-2" : ""}`}>
+            {(role === "admin" || role === "hod") && (
+              <button
+                onClick={() => handleSave(true)}
+                disabled={saving}
+                className="py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-200/60 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Save size={18} />
+                {saving ? "Saving..." : "Approve & Save"}
+              </button>
+            )}
+            <button
+              onClick={() => handleSave(false)}
+              disabled={saving}
+              className="py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-base shadow-lg shadow-indigo-200/60 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Save size={18} />
+              {saving ? "Saving..." : "Save for Approval"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -309,8 +363,8 @@ export function UploadMeetingAudio() {
           <div className="w-16 h-16 rounded-3xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
             <Save className="h-8 w-8 text-emerald-500" />
           </div>
-          <p className="text-lg font-bold text-emerald-700">Tasks saved successfully!</p>
-          <p className="text-sm text-slate-500 mt-1">Tasks are now pending HOD approval before being assigned to faculty.</p>
+          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">Tasks saved successfully!</p>
+          <p className="text-sm text-muted-foreground mt-1">Tasks are now pending HOD approval before being assigned to faculty.</p>
         </div>
       )}
 

@@ -40,7 +40,7 @@ export function FacultyTable({ facultyList, onAssign }: FacultyTableProps) {
                     {facultyList.map((f) => (
                         <tr
                             key={f.id}
-                            className="bg-white/90 hover:bg-white transition-all duration-200 group"
+                            className="bg-white/80 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 transition-all duration-200 group"
                         >
                             {/* Faculty name + email */}
                             <td className="px-6 py-4 rounded-l-2xl">
@@ -50,16 +50,16 @@ export function FacultyTable({ facultyList, onAssign }: FacultyTableProps) {
                                         {(f.name || f.email).substring(0, 2).toUpperCase()}
                                     </div>
                                     <div>
-                                        <p className="text-[#1E1B4B] font-bold text-sm leading-tight">
+                                        <p className="text-foreground font-bold text-sm leading-tight">
                                             {f.name || "—"}
                                         </p>
-                                        <p className="text-slate-500 text-xs mt-0.5">{f.email}</p>
+                                        <p className="text-muted-foreground text-xs mt-0.5">{f.email}</p>
                                     </div>
                                 </div>
                             </td>
 
                             {/* Department */}
-                            <td className="px-4 py-4 text-[#1E1B4B] font-medium text-sm">
+                            <td className="px-4 py-4 text-foreground font-medium text-sm">
                                 {f.department || "Not Assigned"}
                             </td>
 
@@ -69,8 +69,8 @@ export function FacultyTable({ facultyList, onAssign }: FacultyTableProps) {
                                     className={cn(
                                         "text-[11px] font-bold px-3 py-1 rounded-full",
                                         Number(f.active_tasks) > 0
-                                            ? "bg-amber-100 text-amber-700"
-                                            : "bg-emerald-100 text-emerald-700"
+                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400"
+                                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
                                     )}
                                 >
                                     {f.active_tasks} pending
@@ -82,7 +82,7 @@ export function FacultyTable({ facultyList, onAssign }: FacultyTableProps) {
                                 <td className="px-6 py-4 text-right rounded-r-2xl">
                                     <button
                                         onClick={() => onAssign(f)}
-                                        className="inline-flex items-center gap-1.5 bg-[#1E1B4B] text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:scale-105 hover:bg-indigo-900 transition-all duration-200"
+                                        className="inline-flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:scale-105 transition-all duration-200"
                                     >
                                         <Plus className="h-3.5 w-3.5" />
                                         Assign Task

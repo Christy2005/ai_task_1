@@ -11,6 +11,7 @@ import aiRoutes from "./routes/aiRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
+import calendarRoutes from "./routes/calendarRoutes.js";
 import logger from "./utils/logger.js";
 import pool from "./database.js";
 import { verifyToken, requireRole } from "./middleware/authMiddleware.js";
@@ -67,6 +68,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/meetings", meetingRoutes);
+app.use("/api/events", calendarRoutes);
 
 /* =============================
    Admin: Assign Task (alias)
@@ -90,10 +92,10 @@ app.post("/api/admin/assign-task", verifyToken, requireRole("admin"), async (req
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO tasks (title, status, priority, due_date, user_id, created_by)
-       VALUES ($1, 'pending', $2, $3, $4, $5)
+      `INSERT INTO tasks (title, status, priority, due_date, user_id)
+       VALUES ($1, 'pending', $2, $3, $4)
        RETURNING *`,
-      [title, priority, deadline || null, facultyId, req.user.id]
+      [title, priority, deadline || null, facultyId]
     );
 
     logger.info(`[admin/assign-task] "${title}" → faculty ${facultyId} by admin ${req.user.id}`);
@@ -109,7 +111,7 @@ app.post("/api/admin/assign-task", verifyToken, requireRole("admin"), async (req
    GET /api/admin/task-stats
    🛡️ Admin-only — JWT required
 ============================= */
-app.get("/api/admin/task-stats", verifyToken, requireRole("admin"), async (req, res, next) => {
+app.get("/api/admin/task-stats", verifyToken, requireRole("admin", "hod"), async (req, res, next) => {
   try {
     const { rows } = await pool.query(`
       SELECT

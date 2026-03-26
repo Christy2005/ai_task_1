@@ -6,8 +6,10 @@
   "type": "module",
   "scripts": {
     "start": "fuser -k 3000/tcp 2>/dev/null; NODE_NO_WARNINGS=1 node server.js",
-    "dev": "fuser -k 3000/tcp 2>/dev/null; NODE_NO_WARNINGS=1 node --watch server.js"
+    "dev": "fuser -k 3000/tcp 2>/dev/null; NODE_NO_WARNINGS=1 node --watch server.js",
+    "migrate": "node scripts/migrate.js"
   },
+
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
     "@google/generative-ai": "^0.24.1",

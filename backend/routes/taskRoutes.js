@@ -23,17 +23,12 @@ router.get("/", async (req, res, next) => {
       query = `
         SELECT
           t.*,
-          u_assigned.name  AS assigned_to_name,
-          u_assigned.email AS assigned_to_email,
-          u_creator.name   AS created_by_name,
-          u_creator.email  AS created_by_email,
-          u_approver.name  AS approved_by_name,
-          m.title          AS meeting_title
+          u.name  AS assigned_to_name,
+          u.email AS assigned_to_email,
+          m.title AS meeting_title
         FROM tasks t
-        LEFT JOIN users u_assigned ON t.user_id     = u_assigned.id
-        LEFT JOIN users u_creator  ON t.created_by  = u_creator.id
-        LEFT JOIN users u_approver ON t.approved_by  = u_approver.id
-        LEFT JOIN meetings m       ON t.meeting_id   = m.id
+        LEFT JOIN users u    ON t.user_id    = u.id
+        LEFT JOIN meetings m ON t.meeting_id = m.id
         ORDER BY t.created_at DESC
       `;
       params = [];
@@ -42,12 +37,12 @@ router.get("/", async (req, res, next) => {
       query = `
         SELECT
           t.*,
-          u_creator.name  AS created_by_name,
-          u_creator.email AS created_by_email,
-          m.title         AS meeting_title
+          u.name  AS assigned_to_name,
+          u.email AS assigned_to_email,
+          m.title AS meeting_title
         FROM tasks t
-        LEFT JOIN users u_creator ON t.created_by = u_creator.id
-        LEFT JOIN meetings m     ON t.meeting_id  = m.id
+        LEFT JOIN users u    ON t.user_id    = u.id
+        LEFT JOIN meetings m ON t.meeting_id = m.id
         WHERE t.user_id = $1 AND t.approval_status = 'approved'
         ORDER BY t.created_at DESC
       `;
@@ -70,14 +65,12 @@ router.get("/pending-approval", requireRole("admin", "hod"), async (req, res, ne
     const { rows } = await pool.query(`
       SELECT
         t.*,
-        u_assigned.name  AS assigned_to_name,
-        u_assigned.email AS assigned_to_email,
-        u_creator.name   AS created_by_name,
-        m.title          AS meeting_title
+        u.name  AS assigned_to_name,
+        u.email AS assigned_to_email,
+        m.title AS meeting_title
       FROM tasks t
-      LEFT JOIN users u_assigned ON t.user_id    = u_assigned.id
-      LEFT JOIN users u_creator  ON t.created_by = u_creator.id
-      LEFT JOIN meetings m       ON t.meeting_id = m.id
+      LEFT JOIN users u    ON t.user_id    = u.id
+      LEFT JOIN meetings m ON t.meeting_id = m.id
       WHERE t.approval_status = 'pending_approval'
       ORDER BY t.created_at DESC
     `);
@@ -179,10 +172,10 @@ router.post("/", requireRole("admin"), async (req, res, next) => {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO tasks (title, description, status, priority, due_date, user_id, created_by, approval_status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved')
+      `INSERT INTO tasks (title, description, status, priority, due_date, user_id, approval_status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'approved')
        RETURNING *`,
-      [title, description || null, status, priority, due_date || null, user_id, req.user.id]
+      [title, description || null, status, priority, due_date || null, user_id]
     );
 
     logger.info(`Task created: "${title}" assigned to ${user_id} by admin ${req.user.id}`);

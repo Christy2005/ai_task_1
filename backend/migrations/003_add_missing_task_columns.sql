@@ -4,7 +4,7 @@
 -- that the application code requires.
 -- ============================================================
 
--- 1. Add created_by (who created the task) — UUID FK → users.id
+-- 1. Add created_by (who created the task) — INTEGER FK → users.id
 ALTER TABLE tasks
   ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL;
 
