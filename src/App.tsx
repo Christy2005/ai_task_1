@@ -14,6 +14,7 @@ import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { RoleGuard } from "./components/auth/RoleGuard";
 
 const router = createBrowserRouter([
   {
@@ -32,19 +33,35 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Dashboard />,
+        element: (
+          <RoleGuard allowedRoles={["admin", "hod"]}>
+            <Dashboard />
+          </RoleGuard>
+        ),
       },
       {
         path: "upload-audio",
-        element: <UploadMeetingAudio />,
+        element: (
+          <RoleGuard allowedRoles={["hod"]}>
+            <UploadMeetingAudio />
+          </RoleGuard>
+        ),
       },
       {
         path: "meeting-minutes",
-        element: <MeetingMinutes />,
+        element: (
+          <RoleGuard allowedRoles={["admin", "hod"]}>
+            <MeetingMinutes />
+          </RoleGuard>
+        ),
       },
       {
         path: "task-approval",
-        element: <TaskApproval />,
+        element: (
+          <RoleGuard allowedRoles={["hod"]}>
+            <TaskApproval />
+          </RoleGuard>
+        ),
       },
       {
         path: "faculty-tasks",
@@ -56,7 +73,11 @@ const router = createBrowserRouter([
       },
       {
         path: "notifications",
-        element: <Notifications />,
+        element: (
+          <RoleGuard allowedRoles={["admin"]}>
+            <Notifications />
+          </RoleGuard>
+        ),
       },
       {
         path: "calendar",

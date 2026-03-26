@@ -3,6 +3,9 @@ import { createLogger } from "../utils/logger.js";
 
 const logger = createLogger("authMiddleware");
 
+// UUID v4 pattern — rejects old integer-based tokens
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ─── Verify JWT token ──────────────────────────────────────────────────────────
 export const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -16,6 +19,16 @@ export const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     // decoded = { id, email, role, iat, exp }
+
+    // Guard: reject stale tokens that have integer IDs from old schema
+    if (!decoded.id || !UUID_RE.test(String(decoded.id))) {
+      logger.warn(`Rejected stale token — id "${decoded.id}" is not a valid UUID. User must re-login.`);
+      return res.status(401).json({
+        error: "Session expired — please log out and log in again.",
+        code: "STALE_TOKEN",
+      });
+    }
+
     req.user = decoded;
     next();
   } catch (err) {
@@ -42,3 +55,8 @@ export const requireRole = (...roles) => {
     next();
   };
 };
+
+// ─── Convenience role middleware ─────────────────────────────────────────────────
+export const requireAdmin = requireRole("admin");
+export const requireHOD = requireRole("hod");
+export const requireFaculty = requireRole("faculty");

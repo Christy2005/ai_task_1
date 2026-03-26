@@ -9,6 +9,8 @@ import compression from "compression";
 import authRoutes from "./routes/authRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import meetingRoutes from "./routes/meetingRoutes.js";
 import logger from "./utils/logger.js";
 import pool from "./database.js";
 import { verifyToken, requireRole } from "./middleware/authMiddleware.js";
@@ -63,6 +65,8 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/meetings", meetingRoutes);
 
 /* =============================
    Admin: Assign Task (alias)
@@ -76,9 +80,9 @@ app.post("/api/admin/assign-task", verifyToken, requireRole("admin"), async (req
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!facultyId) return res.status(400).json({ error: "facultyId is required" });
 
-    // Verify the target user is a faculty member
+    // Verify the target user is a faculty member or hod
     const assigneeCheck = await pool.query(
-      "SELECT id FROM users WHERE id = $1 AND role = 'faculty'",
+      "SELECT id FROM users WHERE id = $1 AND role IN ('faculty', 'hod')",
       [facultyId]
     );
     if (assigneeCheck.rows.length === 0) {

@@ -1,30 +1,24 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { type ReactNode, useEffect } from "react";
+import type { ReactNode } from "react";
 
 interface ProtectedRouteProps {
   children?: ReactNode;
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated } = useAuth();
   const token = localStorage.getItem("token");
 
-  // Sync auth state if token exists but context is false
-  useEffect(() => {
-    if (token && !isAuthenticated) {
-      login("restored-user"); // restore session (you can improve later)
-    }
-  }, [token, isAuthenticated, login]);
-
-  // If no token → redirect
+  // No token at all → redirect to login
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  // If token exists but context not ready yet
+  // Token exists — AuthContext restores session from JWT on mount.
+  // If not yet hydrated, show nothing briefly while useEffect runs.
   if (!isAuthenticated) {
-    return null; // or loading spinner if you want
+    return null;
   }
 
   return children ? <>{children}</> : <Outlet />;

@@ -10,37 +10,45 @@ const logger = createLogger("taskRoutes");
 router.use(verifyToken);
 
 // ─── GET /api/tasks ────────────────────────────────────────────────────────────
-// Admin → all tasks (with creator + assignee info)
-// Faculty → only tasks assigned to them
+// Admin → all tasks
+// HOD → all tasks (for approval workflow)
+// Faculty → only APPROVED tasks assigned to them
 router.get("/", async (req, res, next) => {
   try {
     const { id: userId, role } = req.user;
 
     let query, params;
 
-    if (role === "admin") {
+    if (role === "admin" || role === "hod") {
       query = `
         SELECT
           t.*,
           u_assigned.name  AS assigned_to_name,
           u_assigned.email AS assigned_to_email,
           u_creator.name   AS created_by_name,
-          u_creator.email  AS created_by_email
+          u_creator.email  AS created_by_email,
+          u_approver.name  AS approved_by_name,
+          m.title          AS meeting_title
         FROM tasks t
-        LEFT JOIN users u_assigned ON t.user_id   = u_assigned.id
-        LEFT JOIN users u_creator  ON t.created_by = u_creator.id
+        LEFT JOIN users u_assigned ON t.user_id     = u_assigned.id
+        LEFT JOIN users u_creator  ON t.created_by  = u_creator.id
+        LEFT JOIN users u_approver ON t.approved_by  = u_approver.id
+        LEFT JOIN meetings m       ON t.meeting_id   = m.id
         ORDER BY t.created_at DESC
       `;
       params = [];
     } else {
+      // Faculty: only see approved tasks assigned to them
       query = `
         SELECT
           t.*,
           u_creator.name  AS created_by_name,
-          u_creator.email AS created_by_email
+          u_creator.email AS created_by_email,
+          m.title         AS meeting_title
         FROM tasks t
         LEFT JOIN users u_creator ON t.created_by = u_creator.id
-        WHERE t.user_id = $1
+        LEFT JOIN meetings m     ON t.meeting_id  = m.id
+        WHERE t.user_id = $1 AND t.approval_status = 'approved'
         ORDER BY t.created_at DESC
       `;
       params = [userId];
@@ -55,6 +63,96 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+// ─── GET /api/tasks/pending-approval ─────────────────────────────────────────
+// HOD + Admin: view tasks awaiting approval
+router.get("/pending-approval", requireRole("admin", "hod"), async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        t.*,
+        u_assigned.name  AS assigned_to_name,
+        u_assigned.email AS assigned_to_email,
+        u_creator.name   AS created_by_name,
+        m.title          AS meeting_title
+      FROM tasks t
+      LEFT JOIN users u_assigned ON t.user_id    = u_assigned.id
+      LEFT JOIN users u_creator  ON t.created_by = u_creator.id
+      LEFT JOIN meetings m       ON t.meeting_id = m.id
+      WHERE t.approval_status = 'pending_approval'
+      ORDER BY t.created_at DESC
+    `);
+
+    return res.json({ tasks: rows });
+  } catch (error) {
+    logger.error("GET /tasks/pending-approval error:", error.message);
+    next(error);
+  }
+});
+
+// ─── PATCH /api/tasks/:id/approve ────────────────────────────────────────────
+// HOD + Admin: approve a task
+router.patch("/:id/approve", requireRole("admin", "hod"), async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+
+    const { rows } = await pool.query(
+      `UPDATE tasks
+       SET approval_status = 'approved', approved_by = $1, approved_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [req.user.id, taskId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    // Create notification for assigned faculty
+    if (rows[0].user_id) {
+      await pool.query(
+        `INSERT INTO notifications (type, title, message, user_id)
+         VALUES ('info', $1, $2, $3)`,
+        [
+          `Task Approved: ${rows[0].title}`,
+          `Your task "${rows[0].title}" has been approved and is now active.`,
+          rows[0].user_id,
+        ]
+      );
+    }
+
+    logger.info(`Task ${taskId} approved by ${req.user.role} ${req.user.id}`);
+    return res.json({ task: rows[0] });
+  } catch (error) {
+    logger.error("PATCH /tasks/:id/approve error:", error.message);
+    next(error);
+  }
+});
+
+// ─── PATCH /api/tasks/:id/reject ─────────────────────────────────────────────
+// HOD + Admin: reject a task
+router.patch("/:id/reject", requireRole("admin", "hod"), async (req, res, next) => {
+  try {
+    const { id: taskId } = req.params;
+
+    const { rows } = await pool.query(
+      `UPDATE tasks
+       SET approval_status = 'rejected', approved_by = $1, approved_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [req.user.id, taskId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    logger.info(`Task ${taskId} rejected by ${req.user.role} ${req.user.id}`);
+    return res.json({ task: rows[0] });
+  } catch (error) {
+    logger.error("PATCH /tasks/:id/reject error:", error.message);
+    next(error);
+  }
+});
 
 // ─── POST /api/tasks ───────────────────────────────────────────────────────────
 // Admin only — create and assign a task to a faculty member
@@ -72,7 +170,7 @@ router.post("/", requireRole("admin"), async (req, res, next) => {
 
     // Verify assignee exists and is a faculty member
     const assigneeCheck = await pool.query(
-      "SELECT id, name, email FROM users WHERE id = $1 AND role = 'faculty'",
+      "SELECT id, name, email FROM users WHERE id = $1 AND role IN ('faculty', 'hod')",
       [user_id]
     );
 
@@ -81,8 +179,8 @@ router.post("/", requireRole("admin"), async (req, res, next) => {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO tasks (title, description, status, priority, due_date, user_id, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO tasks (title, description, status, priority, due_date, user_id, created_by, approval_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved')
        RETURNING *`,
       [title, description || null, status, priority, due_date || null, user_id, req.user.id]
     );
@@ -95,7 +193,6 @@ router.post("/", requireRole("admin"), async (req, res, next) => {
     next(error);
   }
 });
-
 
 // ─── PATCH /api/tasks/:id ─────────────────────────────────────────────────────
 // Admin: can update any field on any task
@@ -137,7 +234,7 @@ router.patch("/:id", async (req, res, next) => {
       return res.json({ task: rows[0] });
     }
 
-    // Admin: allow updating any field
+    // Admin / HOD: allow updating any field
     const { title, description, status, priority, due_date, user_id } = req.body;
 
     const updates = [];
@@ -161,7 +258,7 @@ router.patch("/:id", async (req, res, next) => {
       values
     );
 
-    logger.info(`Task ${taskId} updated by admin ${userId}`);
+    logger.info(`Task ${taskId} updated by ${role} ${userId}`);
     return res.json({ task: rows[0] });
 
   } catch (error) {
@@ -169,7 +266,6 @@ router.patch("/:id", async (req, res, next) => {
     next(error);
   }
 });
-
 
 // ─── DELETE /api/tasks/:id ────────────────────────────────────────────────────
 // Admin only

@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Lock, Mail, ArrowRight, Zap, User } from "lucide-react";
+import { Lock, Mail, ArrowRight, Zap, User, Shield } from "lucide-react";
+
+const ROLE_OPTIONS = [
+    { value: "faculty", label: "Faculty" },
+    { value: "hod", label: "HOD (Head of Department)" },
+    { value: "admin", label: "Admin" },
+];
 
 export function LoginPage() {
     const [isRegister, setIsRegister] = useState(false);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [role, setRole] = useState("faculty");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -31,7 +38,7 @@ export function LoginPage() {
                 : "http://localhost:3000/api/auth/login";
 
             const bodyData = isRegister
-                ? { name, email, password }
+                ? { name, email, password, role }
                 : { email, password };
 
             const response = await fetch(endpoint, {
@@ -45,12 +52,16 @@ export function LoginPage() {
             if (!response.ok) throw new Error(data.error || "Something went wrong");
             if (!data.token) throw new Error("No token received from server");
 
-            localStorage.clear();
-            localStorage.setItem("token", data.token);
-            localStorage.setItem("role", data.role ?? "faculty");
-            login(email);
-            navigate("/", { replace: true });
+            // data.user = { id, name, email, role }
+            const userData = data.user || {
+                id: "",
+                name: name || email,
+                email,
+                role: data.role || "faculty",
+            };
 
+            login(data.token, userData);
+            navigate("/", { replace: true });
 
         } catch (err: any) {
             setError(err.message || "Something went wrong");
@@ -110,35 +121,56 @@ export function LoginPage() {
 
                         {/* Email */}
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Email Address</label>
-                            <div className="flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all">
-                                <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
+                            <div className="input-field flex items-center gap-3 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-accent-indigo transition-all">
+                                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <input
                                     type="email"
                                     required
                                     placeholder="admin@university.edu"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
+                                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none font-medium"
                                 />
                             </div>
                         </div>
 
                         {/* Password */}
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Password</label>
-                            <div className="flex items-center gap-3 bg-white/60 border border-white/50 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-300 transition-all">
-                                <Lock className="h-4 w-4 text-slate-400 shrink-0" />
+                            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                            <div className="input-field flex items-center gap-3 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-accent-indigo transition-all">
+                                <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <input
                                     type="password"
                                     required
-                                    placeholder="••••••••"
+                                    placeholder="Min. 6 characters"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
+                                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none font-medium"
                                 />
                             </div>
                         </div>
+
+                        {/* Role selector (register only) */}
+                        {isRegister && (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Role</label>
+                                <div className="input-field flex items-center gap-3 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-accent-indigo transition-all">
+                                    <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <select
+                                        value={role}
+                                        onChange={(e) => setRole(e.target.value)}
+                                        className="flex-1 bg-transparent text-sm text-foreground focus:outline-none font-medium appearance-none cursor-pointer"
+                                    >
+                                        {ROLE_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Error */}
                         {error && (
@@ -154,18 +186,18 @@ export function LoginPage() {
                             className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-sm shadow-lg shadow-indigo-200/60 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
                         >
                             {loading
-                                ? (isRegister ? "Creating account…" : "Signing in…")
+                                ? (isRegister ? "Creating account..." : "Signing in...")
                                 : (isRegister ? "Create Account" : "Sign In")}
                             <ArrowRight className="h-4 w-4" />
                         </button>
                     </form>
 
                     {/* Toggle */}
-                    <p className="text-center text-sm text-slate-500">
+                    <p className="text-center text-sm text-muted-foreground">
                         {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
                         <button
                             onClick={() => { setError(""); setIsRegister(!isRegister); }}
-                            className="text-indigo-600 font-bold hover:text-indigo-800 transition-colors"
+                            className="text-accent-indigo font-bold hover:text-accent-purple transition-colors"
                         >
                             {isRegister ? "Sign in" : "Create one"}
                         </button>

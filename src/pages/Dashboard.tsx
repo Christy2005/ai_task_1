@@ -176,8 +176,8 @@ export function Dashboard() {
             <div className="grid gap-6 md:grid-cols-2">
                 {/* Recent Tasks */}
                 <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
-                    <div className="px-7 py-5 flex items-center justify-between border-b border-white/40">
-                        <h3 className="font-bold text-slate-800 text-base">Recent Tasks</h3>
+                    <div className="px-7 py-5 flex items-center justify-between border-b border-glass-border">
+                        <h3 className="font-bold card-heading text-base">Recent Tasks</h3>
                         <button
                             onClick={() => navigate("/faculty-tasks")}
                             className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1 transition-colors"
@@ -248,15 +248,15 @@ export function Dashboard() {
 
                 {/* Quick Actions */}
                 <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
-                    <div className="px-7 py-5 border-b border-white/40">
-                        <h3 className="font-bold text-slate-800 text-base">Quick Actions</h3>
+                    <div className="px-7 py-5 border-b border-glass-border">
+                        <h3 className="font-bold card-heading text-base">Quick Actions</h3>
                     </div>
                     <div className="p-7 grid grid-cols-2 gap-4">
                         {quickActions.map((action) => (
                             <button
                                 key={action.label}
                                 onClick={() => navigate(action.href)}
-                                className="flex flex-col items-center gap-3 p-5 rounded-[1.5rem] bg-white/40 border border-white/50 hover:bg-white/70 hover:scale-[1.04] transition-all duration-200 group"
+                                className="flex flex-col items-center gap-3 p-5 rounded-[1.5rem] bg-white/10 border border-glass-border hover:bg-white/20 hover:scale-[1.04] transition-all duration-200 group"
                             >
                                 <div
                                     className={cn(
@@ -267,7 +267,7 @@ export function Dashboard() {
                                 >
                                     <action.icon className="h-6 w-6 text-white" />
                                 </div>
-                                <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 transition-colors">
+                                <span className="text-sm font-semibold card-subtext group-hover:text-accent-indigo transition-colors">
                                     {action.label}
                                 </span>
                             </button>

@@ -308,5 +308,5 @@ function FacultyView() {
 ═══════════════════════════════════════════════════════════ */
 export function FacultyTasks() {
     const { role } = useAuth();
-    return role === "admin" ? <AdminView /> : <FacultyView />;
+    return (role === "admin" || role === "hod") ? <AdminView /> : <FacultyView />;
 }

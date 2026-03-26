@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import pool from "../database.js";
 import { createLogger } from "../utils/logger.js";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken, requireRole } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 const logger = createLogger("authRoutes");
@@ -18,7 +18,7 @@ const loginLimiter = rateLimit({
   message: { error: "Too many login attempts. Try again in 15 minutes." },
 });
 
-const VALID_ROLES = ["admin", "faculty"];
+const VALID_ROLES = ["admin", "hod", "faculty"];
 
 /*
 ========================
@@ -47,19 +47,22 @@ router.post("/register", async (req, res, next) => {
     const newUser = await pool.query(
       `INSERT INTO users (name, email, password, role)
        VALUES ($1, $2, $3, $4)
-       RETURNING id, email, role`,
+       RETURNING id, name, email, role`,
       [name, email, hashedPassword, safeRole]
     );
 
     const user = newUser.rows[0];
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, name: user.name, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
     logger.info(`Registered: ${user.email} (${user.role})`);
-    return res.status(201).json({ token, role: user.role });
+    return res.status(201).json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
 
   } catch (error) {
     logger.error("Register error:", error.message);
@@ -82,7 +85,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     }
 
     const result = await pool.query(
-      "SELECT id, email, password, role FROM users WHERE email = $1",
+      "SELECT id, name, email, password, role FROM users WHERE email = $1",
       [email]
     );
 
@@ -98,13 +101,16 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, name: user.name, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
     logger.info(`Login: ${user.email} (${user.role})`);
-    return res.json({ token, role: user.role });
+    return res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
 
   } catch (error) {
     logger.error("Login error:", error.message);
@@ -179,11 +185,8 @@ router.patch("/me", verifyToken, async (req, res, next) => {
   GET /faculty — Admin: list all faculty users with task counts
 ========================
 */
-router.get("/faculty", verifyToken, async (req, res, next) => {
+router.get("/faculty", verifyToken, requireRole("admin", "hod"), async (req, res, next) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin access required" });
-    }
 
     const { rows } = await pool.query(`
       SELECT

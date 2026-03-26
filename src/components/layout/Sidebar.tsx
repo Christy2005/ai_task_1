@@ -21,19 +21,20 @@ interface SidebarProps {
     onClose: () => void;
 }
 
-const navItems = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
-    { name: "Upload Audio", href: "/upload-audio", icon: Upload },
-    { name: "Meeting Minutes", href: "/meeting-minutes", icon: FileText },
-    { name: "Task Approval", href: "/task-approval", icon: CheckSquare },
-    { name: "Faculty Tasks", href: "/faculty-tasks", icon: ClipboardList },
-    { name: "Notifications", href: "/notifications", icon: Bell },
-    { name: "Calendar", href: "/calendar", icon: Calendar },
-    { name: "Profile", href: "/profile", icon: User },
+const allNavItems = [
+    { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["admin", "hod"] },
+    { name: "Upload Audio", href: "/upload-audio", icon: Upload, roles: ["hod"] },
+    { name: "Meeting Minutes", href: "/meeting-minutes", icon: FileText, roles: ["admin", "hod"] },
+    { name: "Task Approval", href: "/task-approval", icon: CheckSquare, roles: ["hod"] },
+    { name: "Faculty Tasks", href: "/faculty-tasks", icon: ClipboardList, roles: ["admin", "hod", "faculty"] },
+    { name: "Notifications", href: "/notifications", icon: Bell, roles: ["admin"] },
+    { name: "Calendar", href: "/calendar", icon: Calendar, roles: ["admin", "hod", "faculty"] },
+    { name: "Profile", href: "/profile", icon: User, roles: ["admin", "hod", "faculty"] },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-    const { user, logout } = useAuth();
+    const { user, role, logout } = useAuth();
+    const navItems = allNavItems.filter((item) => item.roles.includes(role || "faculty"));
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -41,9 +42,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         navigate("/login");
     };
 
-    // Get initials from email
+    // Get initials from name or email
     const initials = user
-        ? user.split("@")[0].substring(0, 2).toUpperCase()
+        ? (user.name || user.email).split(/[\s@]/)[0].substring(0, 2).toUpperCase()
         : "AD";
 
     return (
@@ -126,8 +127,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             {initials}
                         </div>
                         <div className="overflow-hidden min-w-0">
-                            <p className="text-sm font-bold text-foreground truncate">{user ?? "admin@gmail.com"}</p>
-                            <p className="text-[10px] uppercase tracking-widest text-accent-indigo font-black">Admin</p>
+                            <p className="text-sm font-bold text-foreground truncate">{user?.name || user?.email || "User"}</p>
+                            <p className="text-[10px] uppercase tracking-widest text-accent-indigo font-black">{role || "faculty"}</p>
                         </div>
                     </div>
                 </div>

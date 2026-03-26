@@ -119,24 +119,28 @@ export async function extractTaskDetails(text) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash" });
 
-  const prompt = `
-    Analyze the following transcript and extract ALL tasks mentioned.
-    If multiple tasks/people are mentioned, return an ARRAY of objects.
-    Return ONLY valid JSON — no markdown fences, no extra text.
+  const today = new Date().toISOString().slice(0, 10);
 
-    Format:
-    [
-      {
-        "title": "...",
-        "assignee": "...",
-        "dueDate": "YYYY-MM-DD or empty string",
-        "priority": "Low | Medium | High",
-        "description": "..."
-      }
-    ]
+  const prompt = `You are a meeting-task extraction engine. Extract ALL action items from the transcript below.
 
-    Transcript: "${text}"
-  `;
+RULES:
+1. Return ONLY a valid JSON array — no markdown fences, no commentary, no explanation.
+2. Each element must be an object with exactly these keys (no extras):
+   - "title"       (string, concise action item)
+   - "assignee"    (string, full name of the person responsible — if multiple people share the SAME task, list them comma-separated in ONE string; if different tasks, create SEPARATE objects)
+   - "dueDate"     (string, use ISO "YYYY-MM-DD" format; convert relative dates using today = ${today}; use "" if unknown)
+   - "priority"    (string, exactly one of: "Low", "Medium", "High")
+   - "description" (string, brief context from the meeting)
+3. If no tasks are found, return an empty array: []
+4. Do NOT invent tasks that aren't in the transcript.
+5. Separate distinct tasks into distinct objects — one task per object.
+
+Transcript:
+"""
+${text}
+"""
+
+JSON:`;
 
   try {
     logger.info("Calling Gemini API...");
