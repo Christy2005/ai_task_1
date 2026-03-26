@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import {
     Users, FileAudio, CheckCircle, Clock,
-    ArrowRight, Calendar, Bell, Sparkles, Upload,
+    ArrowRight, Calendar, Sparkles, Upload,
 } from "lucide-react";
+import { NotificationDrawer } from "@/components/layout/NotificationDrawer";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -174,13 +175,7 @@ export function Dashboard() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate("/notifications")}
-                        className="glass-card glass-shadow rounded-2xl p-3 text-muted-foreground hover:text-accent-indigo transition-all hover:scale-105 relative"
-                    >
-                        <Bell className="h-5 w-5" />
-                        <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-rose-500" />
-                    </button>
+                    <NotificationDrawer />
                     <div className="glass-card glass-shadow rounded-2xl px-5 py-2.5 flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-accent-purple" />
                         <span className="text-sm font-bold text-accent-indigo">Admin</span>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ClipboardList, CalendarClock, AlertCircle, Users, CheckCircle2, FileText, Calendar, ArrowRight } from "lucide-react";
+import { ClipboardList, CalendarClock, AlertCircle, Users, CheckCircle2, FileText, Calendar, ArrowRight, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +26,31 @@ interface BackendTask {
     priority: "Low" | "Medium" | "High" | string;
     due_date: string | null;
     meeting_title: string | null;
+    assigned_to_name: string | null;
+    assigned_to_email: string | null;
+    approval_status: string | null;
 }
+
+const VALID_STATUSES = ["pending", "in_progress", "completed"] as const;
+type TaskStatus = typeof VALID_STATUSES[number];
+
+const statusLabel: Record<string, string> = {
+    pending: "Pending",
+    in_progress: "In Progress",
+    completed: "Completed",
+};
+
+const statusColors: Record<string, string> = {
+    completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400",
+    in_progress: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
+    pending: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400",
+};
+
+const approvalColors: Record<string, string> = {
+    approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400",
+    pending_approval: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400",
+    rejected: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400",
+};
 
 interface Meeting {
     id: string;
@@ -162,6 +186,143 @@ function AdminView() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   HOD VIEW — All Tasks Table
+═══════════════════════════════════════════════════════════ */
+function HodView() {
+    const [tasks, setTasks] = useState<BackendTask[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const fetchTasks = async (isRefresh = false) => {
+        if (isRefresh) setRefreshing(true);
+        try {
+            const res = await fetch("http://localhost:3000/api/tasks", {
+                headers: { Authorization: `Bearer ${getToken()}` },
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setTasks(data.tasks || []);
+        } catch (e: any) {
+            setError(e.message || "Network error");
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => { fetchTasks(); }, []);
+
+    return (
+        <div className="space-y-8">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-4xl font-black tracking-tight">
+                        HOD <span className="text-gradient-indigo">Dashboard</span>
+                    </h1>
+                    <p className="text-muted-foreground mt-1">All tasks across faculty members.</p>
+                </div>
+                <button
+                    onClick={() => fetchTasks(true)}
+                    disabled={refreshing}
+                    className="glass-card glass-shadow rounded-2xl p-3 text-muted-foreground hover:text-accent-indigo transition-all hover:scale-105 disabled:opacity-40"
+                    title="Refresh"
+                >
+                    <RefreshCw className={cn("h-5 w-5", refreshing && "animate-spin")} />
+                </button>
+            </div>
+
+            <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
+                <div className="px-8 py-5 border-b border-white/10 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
+                        <ClipboardList className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-bold">All Tasks</h2>
+                        <p className="text-xs text-muted-foreground">{tasks.length} total</p>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="px-8 py-16 text-center text-muted-foreground text-sm">Loading tasks…</div>
+                ) : error ? (
+                    <div className="px-8 py-16 text-center text-rose-400 text-sm">{error}</div>
+                ) : tasks.length === 0 ? (
+                    <div className="px-8 py-16 text-center text-muted-foreground text-sm">No tasks found.</div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-white/10 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                                    <th className="px-6 py-4 text-left">Task</th>
+                                    <th className="px-6 py-4 text-left">Assigned To</th>
+                                    <th className="px-6 py-4 text-left">Priority</th>
+                                    <th className="px-6 py-4 text-left">Due Date</th>
+                                    <th className="px-6 py-4 text-left">Status</th>
+                                    <th className="px-6 py-4 text-left">Approval</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tasks.map((task, i) => (
+                                    <tr
+                                        key={task.id}
+                                        className={cn(
+                                            "hover:bg-white/5 transition-colors",
+                                            i < tasks.length - 1 && "border-b border-white/5"
+                                        )}
+                                    >
+                                        <td className="px-6 py-4">
+                                            <p className="font-semibold text-foreground">{task.title}</p>
+                                            {task.meeting_title && (
+                                                <p className="text-xs text-indigo-400 mt-0.5">From: {task.meeting_title}</p>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-muted-foreground">
+                                            {task.assigned_to_name || task.assigned_to_email || <span className="text-slate-500 italic">Unassigned</span>}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={cn(
+                                                "text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider",
+                                                task.priority === "High"
+                                                    ? "bg-rose-500/20 text-rose-300"
+                                                    : task.priority === "Medium"
+                                                        ? "bg-amber-500/20 text-amber-300"
+                                                        : "bg-blue-500/20 text-blue-300"
+                                            )}>
+                                                {task.priority}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-muted-foreground text-xs">
+                                            {task.due_date ? task.due_date.slice(0, 10) : "—"}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={cn(
+                                                "text-[10px] font-bold px-2.5 py-1 rounded-full",
+                                                statusColors[task.status] || statusColors.pending
+                                            )}>
+                                                {statusLabel[task.status] || task.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={cn(
+                                                "text-[10px] font-bold px-2.5 py-1 rounded-full",
+                                                approvalColors[task.approval_status ?? ""] || "bg-slate-500/20 text-slate-400"
+                                            )}>
+                                                {task.approval_status?.replace("_", " ") || "—"}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════
    FACULTY VIEW — My Assigned Tasks + Meeting Minutes + Calendar
 ═══════════════════════════════════════════════════════════ */
 function FacultyView() {
@@ -170,6 +331,7 @@ function FacultyView() {
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [updatingId, setUpdatingId] = useState<string | null>(null);
 
     useEffect(() => {
         const headers = { Authorization: `Bearer ${getToken()}` };
@@ -186,7 +348,8 @@ function FacultyView() {
             .finally(() => setLoading(false));
     }, []);
 
-    const handleComplete = async (taskId: string) => {
+    const handleStatusChange = async (taskId: string, status: TaskStatus) => {
+        setUpdatingId(taskId);
         try {
             const res = await fetch(`http://localhost:3000/api/tasks/${taskId}`, {
                 method: "PATCH",
@@ -194,13 +357,15 @@ function FacultyView() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${getToken()}`,
                 },
-                body: JSON.stringify({ status: "completed" }),
+                body: JSON.stringify({ status }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to update task");
-            setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: "completed" } : t)));
+            setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
         } catch (e: any) {
             alert(e.message || "Unable to update task status");
+        } finally {
+            setUpdatingId(null);
         }
     };
 
@@ -299,14 +464,23 @@ function FacultyView() {
                                         </div>
                                     </div>
 
-                                    {task.status !== "completed" && (
-                                        <button
-                                            onClick={() => handleComplete(task.id)}
-                                            className="w-full py-2.5 text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl hover:shadow-lg transition-all"
-                                        >
-                                            ✓ Mark Complete
-                                        </button>
-                                    )}
+                                    <select
+                                        value={task.status}
+                                        disabled={updatingId === task.id}
+                                        onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                                        className={cn(
+                                            "w-full py-2.5 px-3 text-xs font-bold rounded-2xl border transition-all appearance-none cursor-pointer",
+                                            "bg-white/10 border-white/20 text-foreground hover:bg-white/20",
+                                            "disabled:opacity-50 disabled:cursor-not-allowed",
+                                            task.status === "completed" && "bg-emerald-500/20 border-emerald-500/30 text-emerald-300"
+                                        )}
+                                    >
+                                        {VALID_STATUSES.map((s) => (
+                                            <option key={s} value={s} className="bg-slate-900 text-white">
+                                                {statusLabel[s]}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             );
                         })}
@@ -389,5 +563,7 @@ function FacultyView() {
 ═══════════════════════════════════════════════════════════ */
 export function FacultyTasks() {
     const { role } = useAuth();
-    return (role === "admin" || role === "hod") ? <AdminView /> : <FacultyView />;
+    if (role === "admin") return <AdminView />;
+    if (role === "hod") return <HodView />;
+    return <FacultyView />;
 }

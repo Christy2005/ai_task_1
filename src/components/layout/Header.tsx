@@ -1,7 +1,7 @@
-import { Menu, Bell } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type { AuthUser } from "@/context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { NotificationDrawer } from "./NotificationDrawer";
 
 interface HeaderProps {
     onMenuClick: () => void;
@@ -14,8 +14,7 @@ function getInitials(user: AuthUser | null): string {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-    const { user, role } = useAuth();
-    const navigate = useNavigate();
+    const { user } = useAuth();
 
     const initials = getInitials(user);
 
@@ -34,13 +33,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             </div>
 
             <div className="flex items-center gap-2">
-                <button
-                    onClick={() => navigate("/notifications")}
-                    className="relative glass-card glass-shadow rounded-xl p-2.5 text-slate-500 hover:text-indigo-600 transition-colors"
-                >
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500" />
-                </button>
+                <NotificationDrawer />
                 <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-black shadow-md">
                     {initials}
                 </div>
