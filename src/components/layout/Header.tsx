@@ -1,18 +1,23 @@
 import { Menu, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import type { AuthUser } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 interface HeaderProps {
     onMenuClick: () => void;
 }
 
+function getInitials(user: AuthUser | null): string {
+    if (!user) return "AD";
+    const source = user.name || user.email || "";
+    return source.split(/[\s@]/)[0].substring(0, 2).toUpperCase() || "AD";
+}
+
 export function Header({ onMenuClick }: HeaderProps) {
-    const { user } = useAuth();
+    const { user, role } = useAuth();
     const navigate = useNavigate();
 
-    const initials = user
-        ? user.split("@")[0].substring(0, 2).toUpperCase()
-        : "AD";
+    const initials = getInitials(user);
 
     return (
         /* Only visible on mobile — desktop has its own page-level header */

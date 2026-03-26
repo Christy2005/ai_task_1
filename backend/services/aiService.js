@@ -110,15 +110,112 @@ export async function speechToText(inputBuffer, mimeType) {
   });
 }
 
-// ─── Gemini: Text → Task Extraction ───────────────────────────────────────────
-export async function extractTaskDetails(text) {
+// ─── Gemini client (singleton) ────────────────────────────────────────────────
+// Instantiated once at module load so every call shares the same connection pool.
+let _geminiModel = null;
+function getGeminiModel() {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is missing from environment variables");
   }
+  if (!_geminiModel) {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    _geminiModel = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash" });
+  }
+  return _geminiModel;
+}
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash" });
+// ─── Throttle: minimum gap between consecutive Gemini calls ───────────────────
+const MIN_CALL_GAP_MS = 1_000; // 1 second
+let _lastCallTime = 0;
 
+async function throttle() {
+  const now = Date.now();
+  const elapsed = now - _lastCallTime;
+  if (elapsed < MIN_CALL_GAP_MS) {
+    const wait = MIN_CALL_GAP_MS - elapsed;
+    logger.info(`Throttling: waiting ${wait}ms before next Gemini call`);
+    await new Promise((r) => setTimeout(r, wait));
+  }
+  _lastCallTime = Date.now();
+}
+
+// ─── callGemini: single API call, no loops ────────────────────────────────────
+async function callGemini(prompt) {
+  await throttle();
+  const model = getGeminiModel();
+  logger.info("Calling Gemini API...");
+  const result = await model.generateContent(prompt);
+  if (!result?.response) throw new Error("No response from Gemini API");
+  const text = result.response.text();
+  logger.debug(`Gemini response: ${text.length} chars`);
+  return text;
+}
+
+// ─── retryWrapper: retry ONCE on 429, then give up ───────────────────────────
+async function retryWrapper(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    const is429 =
+      err?.status === 429 ||
+      err?.message?.includes("429") ||
+      err?.message?.toLowerCase().includes("quota") ||
+      err?.message?.toLowerCase().includes("rate");
+
+    if (!is429) throw err; // not a rate-limit — propagate immediately
+
+    // Extract retryDelay from the error if the SDK provides it, else default 8s
+    const retryAfterMs =
+      (err?.errorDetails?.find?.((d) => d.retryDelay)?.retryDelay ?? 8) * 1_000;
+
+    logger.warn(`Gemini 429 — retrying after ${retryAfterMs}ms`);
+    await new Promise((r) => setTimeout(r, retryAfterMs));
+
+    // One retry — if this also fails, let it throw
+    return await fn();
+  }
+}
+
+// ─── fallbackExtraction: rule-based task extraction when Gemini is unavailable ─
+function fallbackExtraction(text) {
+  logger.warn("Using fallback rule-based task extraction");
+
+  const ACTION_PATTERN =
+    /(?:will|should|must|needs?\s+to|going\s+to|please|kindly|make\s+sure|ensure|follow\s+up|prepare|review|send|submit|complete|update|create|schedule|arrange|check|confirm|report)\s+.{5,120}/gi;
+
+  // Rough name detector: two or more capitalised words that aren't sentence starters
+  const NAME_PATTERN = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g;
+
+  const sentences = text
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const tasks = [];
+
+  for (const sentence of sentences) {
+    if (!ACTION_PATTERN.test(sentence)) continue;
+    ACTION_PATTERN.lastIndex = 0; // reset stateful regex after .test()
+
+    const names = [...sentence.matchAll(NAME_PATTERN)].map((m) => m[1]);
+    const assignee = names.length ? names[0] : "Unassigned";
+
+    tasks.push({
+      title: sentence.length > 80 ? sentence.slice(0, 77) + "..." : sentence,
+      assignee,
+      dueDate: "",
+      priority: "Medium",
+      description: `Extracted by fallback system from: "${sentence}"`,
+    });
+  }
+
+  logger.info(`Fallback extracted ${tasks.length} task(s)`);
+  return tasks;
+}
+
+// ─── Gemini: Text → Task Extraction ───────────────────────────────────────────
+// Entry point: single Gemini call per request, retry-once on 429, fallback on failure.
+export async function extractTaskDetails(text) {
   const today = new Date().toISOString().slice(0, 10);
 
   const prompt = `You are a meeting-task extraction engine. Extract ALL action items from the transcript below.
@@ -143,14 +240,13 @@ ${text}
 JSON:`;
 
   try {
-    logger.info("Calling Gemini API...");
-    const result = await model.generateContent(prompt);
-    if (!result?.response) throw new Error("No response from Gemini API");
-    const responseText = result.response.text();
-    logger.debug("Gemini response length:", responseText.length);
-    return responseText;
-  } catch (error) {
-    logger.error("Gemini API error:", error.message);
-    throw error;
+    // retryWrapper calls callGemini at most twice (original + one retry on 429)
+    return await retryWrapper(() => callGemini(prompt));
+  } catch (err) {
+    logger.error("Gemini failed after retry — using fallback:", err.message);
+
+    // Return fallback tasks as a JSON string so callers get a consistent shape
+    const fallbackTasks = fallbackExtraction(text);
+    return JSON.stringify(fallbackTasks);
   }
 }

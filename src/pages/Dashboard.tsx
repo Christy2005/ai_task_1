@@ -104,7 +104,7 @@ export function Dashboard() {
                     </h1>
                     <p className="text-muted-foreground mt-1">
                         Welcome back,{" "}
-                        <span className="font-bold text-accent-indigo">{user ?? "admin@gmail.com"}</span>
+                        <span className="font-bold text-accent-indigo">{user?.name || user?.email || "admin@gmail.com"}</span>
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
