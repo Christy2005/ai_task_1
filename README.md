@@ -7,7 +7,7 @@ It automates note-taking by transcribing speech and extracting tasks using AI, h
 
 ---
 
-## 🎯 Key Features
+## 🎯 Key Featuress
 - 🎤 Upload meeting audio
 - 📝 Speech-to-text transcription (Deepgram)
 - 🤖 AI-based task extraction (Gemini)
