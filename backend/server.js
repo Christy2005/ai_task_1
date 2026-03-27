@@ -12,6 +12,7 @@ import taskRoutes from "./routes/taskRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
 import logger from "./utils/logger.js";
 import pool from "./database.js";
 import { verifyToken, requireRole } from "./middleware/authMiddleware.js";
@@ -69,6 +70,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/meetings", meetingRoutes);
 app.use("/api/events", calendarRoutes);
+app.use("/api/profile", profileRoutes);
 
 /* =============================
    Admin: Assign Task (alias)

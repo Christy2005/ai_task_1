@@ -10,17 +10,27 @@ router.use(verifyToken);
 
 // ─── GET /api/events ──────────────────────────────────────────────────────────
 // Returns all events + auto-generates events from task due dates.
+// Faculty see: events they created, events they're a participant of,
+//              and events linked to their approved tasks.
 // Optional query params: ?start=YYYY-MM-DD&end=YYYY-MM-DD
 router.get("/", async (req, res, next) => {
   try {
     const { start, end } = req.query;
     const { id: userId, role } = req.user;
 
-    // 1. Manual events (from events table)
+    // 1. Manual events with participant info
     let eventsQuery = `
-      SELECT e.*, u.name AS created_by_name
+      SELECT e.*, u.name AS created_by_name,
+             COALESCE(
+               json_agg(
+                 json_build_object('id', pu.id, 'name', pu.name, 'email', pu.email)
+               ) FILTER (WHERE pu.id IS NOT NULL),
+               '[]'
+             ) AS participants
       FROM events e
       LEFT JOIN users u ON e.created_by = u.id
+      LEFT JOIN event_participants ep ON ep.event_id = e.id
+      LEFT JOIN users pu ON pu.id = ep.user_id
       WHERE 1=1`;
     const eventsParams = [];
 
@@ -33,18 +43,21 @@ router.get("/", async (req, res, next) => {
       eventsQuery += ` AND e.start_date <= $${eventsParams.length}`;
     }
 
-    // Faculty only see events they created or events linked to their tasks
+    // Faculty see events they created, are a participant of, or linked to their tasks
     if (role === "faculty") {
       eventsParams.push(userId);
-      eventsQuery += ` AND (e.created_by = $${eventsParams.length} OR e.task_id IN (
-        SELECT id FROM tasks WHERE user_id = $${eventsParams.length} AND approval_status = 'approved'
-      ))`;
+      const p = eventsParams.length;
+      eventsQuery += ` AND (
+        e.created_by = $${p}
+        OR e.id IN (SELECT event_id FROM event_participants WHERE user_id = $${p})
+        OR e.task_id IN (SELECT id FROM tasks WHERE user_id = $${p} AND approval_status = 'approved')
+      )`;
     }
 
-    eventsQuery += " ORDER BY e.start_date ASC LIMIT 200";
+    eventsQuery += " GROUP BY e.id, u.name ORDER BY e.start_date ASC LIMIT 200";
     const { rows: manualEvents } = await pool.query(eventsQuery, eventsParams);
 
-    // 2. Auto-generate events from task due dates (tasks with a due_date)
+    // 2. Auto-generate events from task due dates
     let tasksQuery = `
       SELECT t.id, t.title, t.due_date, t.priority, t.approval_status,
              u.name AS assigned_to_name
@@ -71,7 +84,6 @@ router.get("/", async (req, res, next) => {
     tasksQuery += " ORDER BY t.due_date ASC LIMIT 200";
     const { rows: taskRows } = await pool.query(tasksQuery, tasksParams);
 
-    // Convert task due dates to event shape (prefixed id so client can tell them apart)
     const taskEvents = taskRows.map((t) => ({
       id: `task-${t.id}`,
       title: `Due: ${t.title}`,
@@ -82,6 +94,7 @@ router.get("/", async (req, res, next) => {
       color: t.priority === "High" ? "red" : t.priority === "Medium" ? "amber" : "blue",
       task_id: t.id,
       is_task_event: true,
+      participants: [],
     }));
 
     return res.json({ events: [...manualEvents, ...taskEvents] });
@@ -92,13 +105,21 @@ router.get("/", async (req, res, next) => {
 });
 
 // ─── POST /api/events ─────────────────────────────────────────────────────────
-// Create a manual calendar event (admin/hod only)
-router.post("/", requireRole("admin", "hod"), async (req, res, next) => {
+// Create a calendar event.
+// Admin/HOD can create and assign participants.
+// Faculty can create personal events (no participants).
+router.post("/", async (req, res, next) => {
   try {
-    const { title, description, start_date, end_date, all_day, color, meeting_id } = req.body;
+    const { title, description, start_date, end_date, all_day, color, meeting_id, participants } = req.body;
+    const { id: userId, role } = req.user;
 
     if (!title) return res.status(400).json({ error: "title is required" });
     if (!start_date) return res.status(400).json({ error: "start_date is required" });
+
+    // Faculty can only create personal events — no participants allowed
+    if (role === "faculty" && participants?.length > 0) {
+      return res.status(403).json({ error: "Faculty cannot assign participants to events" });
+    }
 
     const { rows } = await pool.query(
       `INSERT INTO events (title, description, start_date, end_date, all_day, color, meeting_id, created_by)
@@ -112,12 +133,40 @@ router.post("/", requireRole("admin", "hod"), async (req, res, next) => {
         all_day ?? false,
         color || "indigo",
         meeting_id || null,
-        req.user.id,
+        userId,
       ]
     );
 
-    logger.info(`Event created: "${title}" by ${req.user.role} ${req.user.id}`);
-    return res.status(201).json({ event: rows[0] });
+    const event = rows[0];
+
+    // Insert participants (admin/hod only, validated above)
+    if (participants?.length > 0) {
+      const values = participants.map((_, i) => `($1, $${i + 2})`).join(", ");
+      const params = [event.id, ...participants];
+      await pool.query(
+        `INSERT INTO event_participants (event_id, user_id) VALUES ${values} ON CONFLICT DO NOTHING`,
+        params
+      );
+    }
+
+    // Fetch back with participants
+    const { rows: full } = await pool.query(
+      `SELECT e.*, u.name AS created_by_name,
+              COALESCE(
+                json_agg(json_build_object('id', pu.id, 'name', pu.name, 'email', pu.email))
+                FILTER (WHERE pu.id IS NOT NULL), '[]'
+              ) AS participants
+       FROM events e
+       LEFT JOIN users u ON e.created_by = u.id
+       LEFT JOIN event_participants ep ON ep.event_id = e.id
+       LEFT JOIN users pu ON pu.id = ep.user_id
+       WHERE e.id = $1
+       GROUP BY e.id, u.name`,
+      [event.id]
+    );
+
+    logger.info(`Event created: "${title}" by ${role} ${userId} with ${participants?.length || 0} participant(s)`);
+    return res.status(201).json({ event: full[0] });
   } catch (error) {
     logger.error("POST /events error:", error.message);
     next(error);

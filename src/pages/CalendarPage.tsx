@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Plus, X, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 function getToken() { return localStorage.getItem("token") ?? ""; }
+
+interface Participant {
+    id: string;
+    name: string;
+    email: string;
+}
 
 interface CalEvent {
     id: string;
@@ -14,6 +20,7 @@ interface CalEvent {
     all_day?: boolean;
     color?: string;
     is_task_event?: boolean;
+    participants?: Participant[];
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -45,7 +52,20 @@ export function CalendarPage() {
     const [events, setEvents] = useState<CalEvent[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({ title: "", start_date: "", description: "", color: "indigo" });
+    const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+    const [facultyList, setFacultyList] = useState<{ id: string; name: string; email: string }[]>([]);
     const [saving, setSaving] = useState(false);
+
+    // Fetch faculty list for participant picker (admin/hod only)
+    useEffect(() => {
+        if (!canEdit) return;
+        fetch("http://localhost:3000/api/auth/faculty", {
+            headers: { Authorization: `Bearer ${getToken()}` },
+        })
+            .then((r) => r.json())
+            .then((d) => setFacultyList(d.faculty || []))
+            .catch(() => {});
+    }, [canEdit]);
 
     // Fetch events for the visible month
     useEffect(() => {
@@ -98,6 +118,9 @@ export function CalendarPage() {
                     start_date: form.start_date,
                     color: form.color,
                     all_day: true,
+                    ...(canEdit && selectedParticipants.length > 0
+                        ? { participants: selectedParticipants }
+                        : {}),
                 }),
             });
             const data = await res.json();
@@ -106,6 +129,7 @@ export function CalendarPage() {
             setEvents((prev) => [...prev, data.event]);
             setShowModal(false);
             setForm({ title: "", start_date: "", description: "", color: "indigo" });
+            setSelectedParticipants([]);
         } catch (err: any) {
             alert(err.message || "Failed to create event");
         } finally {
@@ -136,15 +160,13 @@ export function CalendarPage() {
                     </h1>
                     <p className="text-muted-foreground mt-1">Task deadlines and scheduled events.</p>
                 </div>
-                {canEdit && (
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-lg shadow-indigo-200/60 hover:scale-105 transition-all"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Add Event
-                    </button>
-                )}
+                <button
+                    onClick={() => setShowModal(true)}
+                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-lg shadow-indigo-200/60 hover:scale-105 transition-all"
+                >
+                    <Plus className="h-4 w-4" />
+                    Add Event
+                </button>
             </div>
 
             <div className="glass-card glass-shadow rounded-[2rem] overflow-hidden">
@@ -216,12 +238,23 @@ export function CalendarPage() {
                                     {dayEvents.slice(0, 2).map((ev) => (
                                         <div
                                             key={ev.id}
+                                            title={ev.participants && ev.participants.length > 0
+                                                ? `Participants: ${ev.participants.map((p) => p.name).join(", ")}`
+                                                : ev.title}
                                             className={cn(
                                                 "flex items-center justify-between rounded-lg px-1.5 py-0.5 text-[10px] font-semibold leading-tight",
                                                 colorClass(ev.color)
                                             )}
                                         >
-                                            <span className="truncate">{ev.title}</span>
+                                            <span className="truncate flex items-center gap-0.5">
+                                                {ev.title}
+                                                {ev.participants && ev.participants.length > 0 && (
+                                                    <span className="inline-flex items-center gap-px ml-0.5 opacity-70">
+                                                        <Users size={8} />
+                                                        <span>{ev.participants.length}</span>
+                                                    </span>
+                                                )}
+                                            </span>
                                             {canEdit && !ev.is_task_event && (
                                                 <button
                                                     onClick={() => handleDelete(ev.id)}
@@ -333,6 +366,48 @@ export function CalendarPage() {
                                     <option value="red">Red</option>
                                 </select>
                             </div>
+
+                            {/* Participant picker — admin/hod only */}
+                            {canEdit && facultyList.length > 0 && (
+                                <div>
+                                    <label className="text-sm font-semibold text-foreground mb-1 block">
+                                        Assign Faculty
+                                    </label>
+                                    <div className="max-h-40 overflow-y-auto rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-white/60 dark:bg-white/10 p-2 space-y-1">
+                                        {facultyList.map((f) => (
+                                            <label
+                                                key={f.id}
+                                                className={cn(
+                                                    "flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-colors text-sm",
+                                                    selectedParticipants.includes(f.id)
+                                                        ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                                                        : "hover:bg-white/80 dark:hover:bg-white/5 text-foreground"
+                                                )}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedParticipants.includes(f.id)}
+                                                    onChange={() =>
+                                                        setSelectedParticipants((prev) =>
+                                                            prev.includes(f.id)
+                                                                ? prev.filter((id) => id !== f.id)
+                                                                : [...prev, f.id]
+                                                        )
+                                                    }
+                                                    className="accent-indigo-500 rounded"
+                                                />
+                                                <span className="font-medium">{f.name}</span>
+                                                <span className="text-xs text-muted-foreground ml-auto">{f.email}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {selectedParticipants.length > 0 && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {selectedParticipants.length} faculty selected
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-3 pt-2">
