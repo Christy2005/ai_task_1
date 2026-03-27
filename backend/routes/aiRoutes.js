@@ -63,32 +63,48 @@ router.post(
 
       // 2. Text → AI task extraction + fallback
       let rawTasks;
+
+      // Always run rule-based extraction — it's fast and reliable
+      const ruleTasks = extractTasksFromTranscript(transcript);
+      logger.info(`Rule-based extractor found ${ruleTasks.length} task(s)`);
+
       try {
         // Try Gemini first
         const extractedRaw = await extractTaskDetails(transcript);
         logger.debug("Raw AI output:", extractedRaw);
-        rawTasks = parseAITasks(extractedRaw);
-        logger.info(`Gemini extracted ${rawTasks.length} task(s)`);
+        const geminiTasks = parseAITasks(extractedRaw);
+        logger.info(`Gemini extracted ${geminiTasks.length} task(s)`);
+
+        // Use whichever method found MORE tasks — Gemini often merges them
+        if (geminiTasks.length >= ruleTasks.length && geminiTasks.length > 0) {
+          rawTasks = geminiTasks;
+          logger.info("Using Gemini tasks (more or equal)");
+        } else if (ruleTasks.length > 0) {
+          rawTasks = ruleTasks;
+          logger.info("Using rule-based tasks (found more than Gemini)");
+        } else {
+          rawTasks = geminiTasks;
+          logger.info("Using Gemini tasks (rule-based found none)");
+        }
       } catch (aiErr) {
         // Gemini failed OR JSON parse failed — use sentence-based extractor
         logger.warn("AI extraction failed, using transcript extractor:", aiErr.message);
-        rawTasks = extractTasksFromTranscript(transcript);
+        rawTasks = ruleTasks;
+      }
 
-        if (rawTasks.length === 0) {
-          logger.warn("Transcript extractor found nothing, using review placeholder");
-          rawTasks = [
-            {
-              title: "[Review Required] Meeting Tasks",
-              assignee: "",
-              dueDate: "",
-              priority: "Medium",
-              description: transcript.slice(0, 500) + (transcript.length > 500 ? "…" : ""),
-              isFallback: true,
-            },
-          ];
-        } else {
-          logger.info(`Transcript extractor found ${rawTasks.length} task(s)`);
-        }
+      // Guarantee: never return empty
+      if (!rawTasks || rawTasks.length === 0) {
+        logger.warn("No tasks found by any method, using review placeholder");
+        rawTasks = [
+          {
+            title: "[Review Required] Meeting Tasks",
+            assignee: "Unassigned",
+            dueDate: "",
+            priority: "Medium",
+            description: transcript.slice(0, 500) + (transcript.length > 500 ? "…" : ""),
+            isFallback: true,
+          },
+        ];
       }
 
       // 3. Post-process without saving — no meeting_id yet
@@ -219,13 +235,28 @@ router.post(
       // 1. Speech → Text
       const transcript = await speechToText(req.file.buffer, req.file.mimetype);
 
-      // 2. Extract tasks
-      const extractedRaw = await extractTaskDetails(transcript);
+      // 2. Extract tasks — same dual-path strategy as /extract
+      const ruleTasks = extractTasksFromTranscript(transcript);
       let rawTasks;
       try {
-        rawTasks = parseAITasks(extractedRaw);
+        const extractedRaw = await extractTaskDetails(transcript);
+        const geminiTasks = parseAITasks(extractedRaw);
+        rawTasks = geminiTasks.length >= ruleTasks.length && geminiTasks.length > 0
+          ? geminiTasks
+          : ruleTasks.length > 0 ? ruleTasks : geminiTasks;
       } catch {
-        rawTasks = [{ title: "New Task", description: transcript, priority: "Medium", assignee: "" }];
+        rawTasks = ruleTasks;
+      }
+
+      // Guarantee: never empty
+      if (!rawTasks || rawTasks.length === 0) {
+        rawTasks = [{
+          title: "[Review Required] Meeting Tasks",
+          assignee: "Unassigned",
+          dueDate: "",
+          priority: "Medium",
+          description: transcript.slice(0, 500) + (transcript.length > 500 ? "…" : ""),
+        }];
       }
 
       // 3. Create meeting

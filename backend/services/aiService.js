@@ -187,18 +187,62 @@ function fallbackExtraction(text) {
   const VERB_RE =
     /\b(will|would|should|must|shall|needs?\s+to|has\s+to|have\s+to|going\s+to|please|kindly|can)\b/i;
 
-  // Split on sentence terminators AND mid-sentence connectors
-  const segments = text
+  // Indirect assignment: "ask Hardik to submit", "tell Monica to prepare"
+  const INDIRECT_RE =
+    /\b(?:ask|tell|get|have|let|remind|assign|request|want)\s+([A-Z][a-z]+)\s+to\s+(.+)/i;
+
+  const FILLER_RE =
+    /^(?:okay|ok|yeah|yes|yep|sure|right|alright|so|well|basically|actually|i\s+think|i\s+mean|you\s+know|like|and|also|then|next|finally)[,\s]+/i;
+
+  // Expand contractions: "I'll" → "I will", "we'll" → "we will"
+  const expanded = text
+    .replace(/\bI'll\b/gi, "I will").replace(/\bwe'll\b/gi, "we will")
+    .replace(/\byou'll\b/gi, "you will").replace(/\bthey'll\b/gi, "they will")
+    .replace(/\bhe'll\b/gi, "he will").replace(/\bshe'll\b/gi, "she will")
+    .replace(/\blet's\b/gi, "let us");
+
+  // Split on sentence terminators, connectors, and commas before Name+Verb
+  const SPLIT_RE =
+    /\s+(?:while|whereas|and\s+then|then|also|okay|ok)\s+(?=[A-Z])|\s*,\s+(?=[A-Z][a-z]+\s+(?:will|would|should|must|shall|needs?\s+to|has\s+to|have\s+to|can)\s)/i;
+
+  const segments = expanded
     .split(/[.!?\n]+/)
-    .flatMap((s) => s.split(/\s+(?:while|whereas|then|also)\s+(?=[A-Z])/i))
+    .flatMap((s) => s.split(SPLIT_RE))
     .map((s) => s.trim())
     .filter((s) => s.length > 5);
 
-  const NOT_NAME = /^(everyone|all|we|they|team|it|this|that|the|a|an|each|every|he|she|i|you|so|and|but|or|if|now|well|okay|right|please|also|first|next|finally)$/i;
+  const NOT_NAME = /^(everyone|all|we|they|team|it|this|that|the|a|an|each|every|he|she|i|you|so|and|but|or|if|now|well|okay|right|please|also|first|next|finally|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|today|tomorrow|unassigned)$/i;
 
   const tasks = [];
 
-  for (const segment of segments) {
+  for (let segment of segments) {
+    // Strip conversational fillers
+    let prev;
+    do {
+      prev = segment;
+      segment = segment.replace(FILLER_RE, "").trim();
+    } while (segment !== prev);
+
+    if (segment.length < 6) continue;
+
+    // Try indirect assignment first: "ask Hardik to submit"
+    const indirectMatch = segment.match(INDIRECT_RE);
+    if (indirectMatch) {
+      const name = indirectMatch[1];
+      let title = indirectMatch[2].trim();
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+      if (title.length > 100) title = title.slice(0, 97) + "...";
+
+      tasks.push({
+        title,
+        assignee: name,
+        dueDate: "",
+        priority: "Medium",
+        description: `Extracted from: "${segment}"`,
+      });
+      continue;
+    }
+
     if (!VERB_RE.test(segment)) continue;
 
     // Extract assignee: first capitalized word that looks like a name
@@ -215,13 +259,17 @@ function fallbackExtraction(text) {
     // Build title: strip the assignee name and connector verb preamble
     let title = segment;
     if (assignee) {
-      // Remove everything up to and including the connector verb
       const verbMatch = segment.match(
         new RegExp(`${assignee}\\s+(?:would|will|should|must|shall|needs?\\s+to|has\\s+to|have\\s+to|is\\s+going\\s+to|can)\\s+`, "i")
       );
       if (verbMatch) {
         title = segment.slice(verbMatch.index + verbMatch[0].length).trim();
       }
+    } else {
+      // Pronoun subject — strip "I'll / We will / You should" etc. to get clean title
+      title = segment
+        .replace(/^(?:i'll|i\s+will|we\s+will|we'll|you\s+should|you\s+will|you'll|let's|let\s+us)\s+/i, "")
+        .trim();
     }
 
     // Capitalize and limit length
@@ -248,17 +296,24 @@ export async function extractTaskDetails(text) {
 
   const prompt = `You are a meeting-task extraction engine. Extract ALL action items from the transcript below.
 
+This is a REAL conversational transcript with filler words, informal speech, and multiple speakers. Pay close attention to EVERY person mentioned and EVERY action assigned.
+
 RULES:
-1. Return ONLY a valid JSON array — no markdown fences, no commentary, no explanation.
+1. Return ONLY a valid JSON array — no markdown fences, no commentary, no explanation, no text before or after the JSON.
 2. Each element must be an object with exactly these keys (no extras):
-   - "title"       (string, concise action item)
-   - "assignee"    (string, full name of the person responsible — if multiple people share the SAME task, list them comma-separated in ONE string; if different tasks, create SEPARATE objects)
+   - "title"       (string, concise action item — remove filler words like "okay", "yeah", "I think", "basically")
+   - "assignee"    (string, full name of the person responsible — extract the actual person name, NOT pronouns like "I", "we", "you". If the speaker says "I'll ask Hardik to submit", the assignee is "Hardik", NOT the speaker. If truly unknown, use "Unassigned")
    - "dueDate"     (string, use ISO "YYYY-MM-DD" format; convert relative dates using today = ${today}; use "" if unknown)
    - "priority"    (string, exactly one of: "Low", "Medium", "High")
    - "description" (string, brief context from the meeting)
 3. If no tasks are found, return an empty array: []
 4. Do NOT invent tasks that aren't in the transcript.
-5. Separate distinct tasks into distinct objects — one task per object.
+5. CRITICAL: Separate DISTINCT tasks into DISTINCT objects — one task per object. If a sentence contains "A will do X while B will do Y", that is TWO tasks, not one.
+6. Look for tasks in ALL sentence structures:
+   - Direct: "Christy should submit the report"
+   - Indirect: "I'll ask Hardik to verify the data"
+   - Compound: "Christy will submit report while Aditya will handle attendance"
+   - Imperative: "Please send the email by Friday"
 
 Transcript:
 """
