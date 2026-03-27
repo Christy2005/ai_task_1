@@ -6,23 +6,52 @@ const logger = createLogger("taskPostProcess");
 // ─── Clean AI JSON output ────────────────────────────────────────────────────
 // Strips markdown fences, trailing commas, and other common Gemini artifacts.
 export function cleanAIJson(raw) {
-  let cleaned = raw
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
+  let cleaned = raw.trim();
+
+  // Remove markdown fences (```json ... ``` or ``` ... ```)
+  // Handle fences that may appear anywhere, not just start/end
+  cleaned = cleaned.replace(/```json\s*/gi, "");
+  cleaned = cleaned.replace(/```\s*/gi, "");
+
+  // Remove any leading text before the first [ or {
+  const firstBracket = cleaned.search(/[\[{]/);
+  if (firstBracket > 0) {
+    cleaned = cleaned.slice(firstBracket);
+  }
+
+  // Remove any trailing text after the last ] or }
+  const lastBracket = Math.max(cleaned.lastIndexOf("]"), cleaned.lastIndexOf("}"));
+  if (lastBracket >= 0 && lastBracket < cleaned.length - 1) {
+    cleaned = cleaned.slice(0, lastBracket + 1);
+  }
 
   // Remove trailing commas before } or ]
   cleaned = cleaned.replace(/,\s*([}\]])/g, "$1");
 
-  return cleaned;
+  // Remove single-line JS comments (// ...)
+  cleaned = cleaned.replace(/\/\/[^\n]*/g, "");
+
+  return cleaned.trim();
 }
 
 // ─── Parse AI response into task array ───────────────────────────────────────
 export function parseAITasks(rawText) {
   const cleaned = cleanAIJson(rawText);
-  const parsed = JSON.parse(cleaned);
-  return Array.isArray(parsed) ? parsed : [parsed];
+  let parsed;
+
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (e) {
+    // Try to fix common JSON issues: single quotes, unquoted keys
+    const patched = cleaned
+      .replace(/'/g, '"')
+      .replace(/(\w+)\s*:/g, '"$1":');
+    parsed = JSON.parse(patched); // let this throw if it still fails
+  }
+
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === "object") return [parsed];
+  throw new Error("Gemini returned non-object JSON");
 }
 
 // ─── Convert relative dates to ISO format ────────────────────────────────────
@@ -107,14 +136,17 @@ function formatDate(date) {
 const CONNECTORS = [
   /^(.+?)\s+should\s+(.+)$/i,
   /^(.+?)\s+will\s+(.+)$/i,
+  /^(.+?)\s+would\s+(.+)$/i,
   /^(.+?)\s+must\s+(.+)$/i,
   /^(.+?)\s+shall\s+(.+)$/i,
   /^(.+?)\s+needs?\s+to\s+(.+)$/i,
   /^(.+?)\s+has\s+to\s+(.+)$/i,
+  /^(.+?)\s+have\s+to\s+(.+)$/i,
   /^(.+?)\s+is\s+going\s+to\s+(.+)$/i,
   /^(.+?)\s+is\s+to\s+(.+)$/i,
   /^(.+?)\s+is\s+responsible\s+for\s+(.+)$/i,
   /^(.+?)\s+is\s+tasked\s+with\s+(.+)$/i,
+  /^(.+?)\s+can\s+(.+)$/i,
   /^(.+?)\s*:\s*(.+)$/,           // "Benita: submit tutorial"
 ];
 
@@ -159,16 +191,17 @@ function stripLeadingFillers(sentence) {
 
 // ─── Connector-verb detector (used for compound-sentence splitting) ───────────
 const CONNECTOR_VERB_RE =
-  /\b(will|should|must|shall|needs?\s+to|has\s+to|is\s+going\s+to)\b/i;
+  /\b(will|would|should|must|shall|needs?\s+to|has\s+to|have\s+to|is\s+going\s+to|can)\b/i;
 
 // ─── Split compound assignments within one sentence ───────────────────────────
-// "A, B will do X, and C, D will do Y"
-//   → ["A, B will do X", "C, D will do Y"]
+// "A will do X while B will do Y"         → ["A will do X", "B will do Y"]
+// "A, B will do X, and C, D will do Y"    → ["A, B will do X", "C, D will do Y"]
+// "A will do X then B should do Y"        → ["A will do X", "B should do Y"]
 // Only promotes a part to its own clause when it contains a connector verb;
 // otherwise re-attaches it to the previous part so "do X and Y" stays whole.
 function splitCompoundAssignments(sentence) {
-  // Split at ", and <Capital>" or " and <Capital>" boundaries
-  const parts = sentence.split(/\s*,?\s+and\s+(?=[A-Z])/);
+  // Split on "while", "whereas", "and", "then", "also" when followed by a capitalized word
+  const parts = sentence.split(/\s*[,;]?\s+(?:while|whereas|and|then|also)\s+(?=[A-Z])/);
   if (parts.length === 1) return [sentence];
 
   const clauses = [parts[0]];
@@ -198,10 +231,29 @@ function splitCompoundAssignments(sentence) {
 export function extractTasksFromTranscript(transcript) {
   if (!transcript || !transcript.trim()) return [];
 
-  const sentences = transcript
+  // First pass: split on sentence terminators
+  const roughSentences = transcript
     .split(/[.!?\n]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 5);
+
+  // Second pass: further split on mid-sentence connectors ("while", "then", etc.)
+  // but ONLY when followed by a word that has a connector verb after it,
+  // to avoid splitting legitimate phrases like "submit report while waiting"
+  const sentences = [];
+  for (const s of roughSentences) {
+    const subParts = s.split(/\s*(?:;)\s*/).flatMap((part) => {
+      // Split on "while"/"whereas"/"then"/"also" when they introduce a new clause
+      // with a connector verb (will/should/would/must/etc.)
+      return part.split(
+        /\s+(?:while|whereas|then|also)\s+(?=\S+\s+(?:will|would|should|must|shall|needs?\s+to|has\s+to|have\s+to|is\s+going\s+to|can)\s)/i
+      );
+    });
+    for (const sub of subParts) {
+      const trimmed = sub.trim();
+      if (trimmed.length > 5) sentences.push(trimmed);
+    }
+  }
 
   const tasks = [];
 
@@ -231,7 +283,7 @@ export function extractTasksFromTranscript(transcript) {
         // 4. One task per name, same task content
         for (const name of names) {
           tasks.push({
-            title: capitalize(taskPart),
+            title: cleanTaskTitle(capitalize(taskPart)),
             assigned_to: name,
             dueDate: "",
             priority: "Medium",
@@ -245,6 +297,17 @@ export function extractTasksFromTranscript(transcript) {
   }
 
   return tasks;
+}
+
+// ─── Clean task title of leading filler verbs ─────────────────────────────────
+// "would submit report" → "Submit report"
+// "have to complete review" → "Complete review"
+function cleanTaskTitle(title) {
+  return capitalize(
+    title
+      .replace(/^(?:would|have\s+to|has\s+to|needs?\s+to|going\s+to)\s+/i, "")
+      .trim()
+  );
 }
 
 // ─── Split multiple names into separate tasks ────────────────────────────────

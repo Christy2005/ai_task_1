@@ -177,35 +177,63 @@ async function retryWrapper(fn) {
 }
 
 // ─── fallbackExtraction: rule-based task extraction when Gemini is unavailable ─
+// This is the aiService-level fallback. The primary rule-based extractor is
+// extractTasksFromTranscript() in taskPostProcess.js, which handles connector
+// verbs and compound sentences. This function is only reached when both Gemini
+// AND the transcript extractor have already failed or returned nothing.
 function fallbackExtraction(text) {
   logger.warn("Using fallback rule-based task extraction");
 
-  const ACTION_PATTERN =
-    /(?:will|should|must|needs?\s+to|going\s+to|please|kindly|make\s+sure|ensure|follow\s+up|prepare|review|send|submit|complete|update|create|schedule|arrange|check|confirm|report)\s+.{5,120}/gi;
+  const VERB_RE =
+    /\b(will|would|should|must|shall|needs?\s+to|has\s+to|have\s+to|going\s+to|please|kindly|can)\b/i;
 
-  // Rough name detector: two or more capitalised words that aren't sentence starters
-  const NAME_PATTERN = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g;
-
-  const sentences = text
+  // Split on sentence terminators AND mid-sentence connectors
+  const segments = text
     .split(/[.!?\n]+/)
+    .flatMap((s) => s.split(/\s+(?:while|whereas|then|also)\s+(?=[A-Z])/i))
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => s.length > 5);
+
+  const NOT_NAME = /^(everyone|all|we|they|team|it|this|that|the|a|an|each|every|he|she|i|you|so|and|but|or|if|now|well|okay|right|please|also|first|next|finally)$/i;
 
   const tasks = [];
 
-  for (const sentence of sentences) {
-    if (!ACTION_PATTERN.test(sentence)) continue;
-    ACTION_PATTERN.lastIndex = 0; // reset stateful regex after .test()
+  for (const segment of segments) {
+    if (!VERB_RE.test(segment)) continue;
 
-    const names = [...sentence.matchAll(NAME_PATTERN)].map((m) => m[1]);
-    const assignee = names.length ? names[0] : "Unassigned";
+    // Extract assignee: first capitalized word that looks like a name
+    const words = segment.split(/\s+/);
+    let assignee = "";
+    for (const word of words) {
+      const clean = word.replace(/[,;:'"]+/g, "");
+      if (/^[A-Z][a-z]{1,}$/.test(clean) && !NOT_NAME.test(clean)) {
+        assignee = clean;
+        break;
+      }
+    }
+
+    // Build title: strip the assignee name and connector verb preamble
+    let title = segment;
+    if (assignee) {
+      // Remove everything up to and including the connector verb
+      const verbMatch = segment.match(
+        new RegExp(`${assignee}\\s+(?:would|will|should|must|shall|needs?\\s+to|has\\s+to|have\\s+to|is\\s+going\\s+to|can)\\s+`, "i")
+      );
+      if (verbMatch) {
+        title = segment.slice(verbMatch.index + verbMatch[0].length).trim();
+      }
+    }
+
+    // Capitalize and limit length
+    title = title.charAt(0).toUpperCase() + title.slice(1);
+    if (title.length > 100) title = title.slice(0, 97) + "...";
 
     tasks.push({
-      title: sentence.length > 80 ? sentence.slice(0, 77) + "..." : sentence,
-      assignee,
+      title,
+      assignee: assignee || "Unassigned",
       dueDate: "",
       priority: "Medium",
-      description: `Extracted by fallback system from: "${sentence}"`,
+      description: `Extracted from: "${segment}"`,
     });
   }
 
